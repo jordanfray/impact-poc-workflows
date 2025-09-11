@@ -270,9 +270,20 @@ export default function AccountPage() {
     </Flex>
   )
 
+  const backButton = (
+    <Button 
+      variant="ghost" 
+      onClick={() => router.push('/accounts')}
+      style={{ cursor: 'pointer' }}
+    >
+      <ArrowLeft size={16} />
+      Back to Accounts
+    </Button>
+  )
+
   if (loading) {
     return (
-      <DashboardLayout title="Loading..." action={actionButtons}>
+      <DashboardLayout title="Loading..." action={backButton}>
         <Text>Loading account details...</Text>
       </DashboardLayout>
     )
@@ -280,7 +291,7 @@ export default function AccountPage() {
 
   if (error || !account) {
     return (
-      <DashboardLayout title="Error" action={actionButtons}>
+      <DashboardLayout title="Error" action={backButton}>
         <Card style={{ padding: 20, textAlign: 'center' }}>
           <Text color="red">{error || 'Account not found'}</Text>
         </Card>
