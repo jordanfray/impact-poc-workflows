@@ -218,30 +218,28 @@ npm run prisma:migrate
 
 ## 🎨 Fonts Configuration
 
-### Font Files Not Included
-The original design uses **F37Jan** and **Poppins** fonts, but the font files are not included in this repository due to:
-- Licensing restrictions (F37Jan is a commercial font)
-- File size considerations
-- Repository portability
+### Font Files Included
+The original design uses **F37Jan** and **Poppins** fonts, which are now included in this repository:
+- **F37Jan**: Located in `public/fonts/f37-jan/` (used for headings)
+- **Poppins**: Located in `public/fonts/poppins/` (used for body text)
 
-### Current Fallbacks
-The application will gracefully fallback to:
-- **Headings**: Space Grotesk → Inter → system fonts
-- **Body text**: Inter → system fonts
+### Font Loading
+The application will load fonts in this order:
+- **Headings**: F37Jan → system font fallbacks
+- **Body text**: Poppins → system font fallbacks
 
-### Adding Original Fonts (Optional)
-If you have licenses for the original fonts:
-
-1. **F37Jan fonts**: Place in `public/fonts/f37-jan/`
-   - F37Jan-Regular.otf
-   - F37Jan-Bold.otf
-   - F37Jan-Light.otf
-   - (and other weights as needed)
-
-2. **Poppins fonts**: Place in `public/fonts/poppins/Web Fonts/Poppins/`
-   - Poppins-Regular.woff2
-   - Poppins-Bold.woff2
-   - Poppins-Medium.woff2
-   - (and other weights as needed)
-
-3. **Restart the dev server** after adding fonts
+### Font Files Structure
+The fonts are organized as follows:
+```
+public/fonts/
+├── f37-jan/
+│   ├── F37Jan-Regular.otf
+│   ├── F37Jan-Bold.otf
+│   ├── F37Jan-Light.otf
+│   └── ... (additional weights)
+└── poppins/
+    └── Web Fonts/Poppins/
+        ├── Poppins-Regular.woff2
+        ├── Poppins-Bold.woff2
+        └── ... (additional weights)
+```
