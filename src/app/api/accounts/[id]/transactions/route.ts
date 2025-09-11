@@ -7,16 +7,23 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log('🔄 POST /api/accounts/[id]/transactions called')
+  console.log('📋 Request params:', params)
+  
   try {
     // Get auth header
     const authHeader = request.headers.get('authorization')
+    console.log('🔐 Auth header check:', { hasAuthHeader: !!authHeader, startsWithBearer: authHeader?.startsWith('Bearer ') })
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Missing or invalid authorization header')
       return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
     }
 
     // Create a server-side Supabase client with the user's token
     const token = authHeader.replace('Bearer ', '')
+    console.log('🔑 Token extracted, creating Supabase client...')
+    
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
@@ -29,26 +36,35 @@ export async function POST(
       }
     )
     
+    console.log('👤 Getting user from Supabase...')
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    console.log('👤 User check:', { hasUser: !!user, userId: user?.id, authError: authError?.message })
     
     if (authError || !user) {
+      console.error('❌ User authentication failed:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Parse request body
+    console.log('📦 Parsing request body...')
     const body = await request.json()
+    console.log('📦 Request body:', body)
     const { amount, type = 'DEPOSIT', description } = body
 
     // Validate input
+    console.log('✅ Validating input:', { amount, type, amountType: typeof amount })
     if (!amount || typeof amount !== 'number' || amount <= 0) {
+      console.error('❌ Invalid amount validation failed:', { amount, type: typeof amount })
       return NextResponse.json({ error: 'Valid amount is required and must be positive' }, { status: 400 })
     }
 
     if (!['DEPOSIT', 'WITHDRAWAL'].includes(type)) {
+      console.error('❌ Invalid transaction type:', type)
       return NextResponse.json({ error: 'Transaction type must be DEPOSIT or WITHDRAWAL' }, { status: 400 })
     }
 
     // Verify user has access to this account
+    console.log('🏦 Checking account access...', { accountId: params.id, userId: user.id })
     const account = await prisma.account.findFirst({
       where: {
         id: params.id,
@@ -59,13 +75,17 @@ export async function POST(
         }
       }
     })
+    console.log('🏦 Account check result:', { hasAccount: !!account, accountId: account?.id, nickname: account?.nickname })
 
     if (!account) {
+      console.error('❌ Account not found or access denied')
       return NextResponse.json({ error: 'Account not found or access denied' }, { status: 404 })
     }
 
     // Create transaction and update account balance in a database transaction
+    console.log('💾 Starting database transaction...')
     const result = await prisma.$transaction(async (tx) => {
+      console.log('💾 Creating transaction record...')
       // Create the transaction record
       const transaction = await tx.transaction.create({
         data: {
@@ -75,7 +95,9 @@ export async function POST(
           status: 'CLEARED' // ACH deposits are immediately cleared for demo purposes
         }
       })
+      console.log('💾 Transaction created:', { id: transaction.id, amount: transaction.amount })
 
+      console.log('💰 Updating account balance...')
       // Update account balance
       const updatedAccount = await tx.account.update({
         where: {
@@ -87,22 +109,31 @@ export async function POST(
           }
         }
       })
+      console.log('💰 Account balance updated:', { newBalance: updatedAccount.balance })
 
       return { transaction, account: updatedAccount }
     })
 
     console.log(`✅ ${type} transaction created: $${amount} for account ${account.nickname} (${user.email})`)
 
-    return NextResponse.json({
+    const responseData = {
       transaction: result.transaction,
       account: result.account,
       message: `${type.toLowerCase()} processed successfully`
-    }, { status: 201 })
+    }
+    console.log('📤 Sending response:', responseData)
+
+    return NextResponse.json(responseData, { status: 201 })
 
   } catch (error) {
-    console.error('Error creating transaction:', error)
+    console.error('❌ ERROR creating transaction:', error)
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    })
     return NextResponse.json(
-      { error: 'Failed to process transaction' },
+      { error: 'Failed to process transaction', details: error.message },
       { status: 500 }
     )
   }

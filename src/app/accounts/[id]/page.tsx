@@ -193,8 +193,10 @@ export default function AccountPage() {
 
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount)
+    console.log('🔄 Starting deposit process:', { amount, depositAmount, accountId })
     
     if (!amount || amount <= 0) {
+      console.error('❌ Invalid amount:', amount)
       setError('Please enter a valid amount')
       return
     }
@@ -202,14 +204,28 @@ export default function AccountPage() {
     try {
       setDepositing(true)
       setError(null)
+      console.log('🔐 Getting auth session...')
       
       // Get the current session to get the access token
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔐 Session check:', { hasSession: !!session, hasToken: !!session?.access_token })
       
       if (!session?.access_token) {
+        console.error('❌ No authentication token found')
         setError('No authentication token found')
         return
       }
+
+      const requestBody = {
+        amount: amount,
+        type: 'DEPOSIT'
+      }
+      console.log('📤 Making API request:', {
+        url: `/api/accounts/${accountId}/transactions`,
+        method: 'POST',
+        body: requestBody,
+        hasAuthHeader: true
+      })
 
       const response = await fetch(`/api/accounts/${accountId}/transactions`, {
         method: 'POST',
@@ -217,33 +233,42 @@ export default function AccountPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({
-          amount: amount,
-          type: 'DEPOSIT'
-        })
+        body: JSON.stringify(requestBody)
+      })
+
+      console.log('📥 API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
       })
 
       if (!response.ok) {
-        throw new Error('Failed to process deposit')
+        const errorData = await response.text()
+        console.error('❌ API error response:', errorData)
+        throw new Error(`Failed to process deposit: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
+      console.log('✅ Deposit successful:', data)
       
       // Update account with new balance
       setAccount(prev => prev ? { ...prev, balance: data.account.balance } : null)
+      console.log('💰 Updated account balance:', data.account.balance)
       
       // Reset form and close dialog
       setDepositAmount('')
       setShowDepositDialog(false)
       
       // Refresh account data to get updated transactions
+      console.log('🔄 Refreshing account data...')
       fetchAccount()
       
     } catch (err) {
-      console.error('Error processing deposit:', err)
-      setError('Failed to process deposit')
+      console.error('❌ Error processing deposit:', err)
+      setError(`Failed to process deposit: ${err.message}`)
     } finally {
       setDepositing(false)
+      console.log('🏁 Deposit process completed')
     }
   }
 
