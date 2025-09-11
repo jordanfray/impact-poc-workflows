@@ -1,9 +1,3 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
-
--- CreateEnum
-CREATE TYPE "public"."UserRole" AS ENUM ('ADMIN', 'USER');
-
 -- CreateEnum
 CREATE TYPE "public"."TransactionStatus" AS ENUM ('PENDING', 'DECLINED', 'CLEARED');
 
@@ -12,19 +6,6 @@ CREATE TYPE "public"."TransactionType" AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'CHECK_
 
 -- CreateEnum
 CREATE TYPE "public"."CheckStatus" AS ENUM ('PENDING', 'CANCELED', 'DEPOSITED');
-
--- CreateTable
-CREATE TABLE "public"."users" (
-    "id" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "name" TEXT,
-    "avatar" TEXT,
-    "role" "public"."UserRole" NOT NULL DEFAULT 'USER',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
-);
 
 -- CreateTable
 CREATE TABLE "public"."accounts" (
@@ -104,9 +85,6 @@ CREATE TABLE "public"."checks" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
-
--- CreateIndex
 CREATE UNIQUE INDEX "accounts_accountNumber_key" ON "public"."accounts"("accountNumber");
 
 -- CreateIndex
@@ -135,4 +113,3 @@ ALTER TABLE "public"."cards" ADD CONSTRAINT "cards_accountId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "public"."checks" ADD CONSTRAINT "checks_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "public"."recipients"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
