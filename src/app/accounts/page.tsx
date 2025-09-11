@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Flex, Box, Text, Button, Card, Badge, Table } from "@radix-ui/themes"
+import { Flex, Box, Text, Button, Card, Badge, Table, IconButton } from "@radix-ui/themes"
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus"
 import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard"
+import { Eye } from "@phosphor-icons/react/dist/ssr/Eye"
+import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash"
 import { DashboardLayout } from "@/components/DashboardLayout"
 
 interface Account {
@@ -26,6 +28,7 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [visibleAccountNumbers, setVisibleAccountNumbers] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchAccounts()
@@ -114,6 +117,16 @@ export default function AccountsPage() {
   const maskAccountNumber = (accountNumber: string) => {
     if (accountNumber.length <= 4) return accountNumber
     return `****${accountNumber.slice(-4)}`
+  }
+
+  const toggleAccountNumberVisibility = (accountId: string) => {
+    const newVisibleNumbers = new Set(visibleAccountNumbers)
+    if (newVisibleNumbers.has(accountId)) {
+      newVisibleNumbers.delete(accountId)
+    } else {
+      newVisibleNumbers.add(accountId)
+    }
+    setVisibleAccountNumbers(newVisibleNumbers)
   }
 
   const createAccountButton = (
@@ -213,9 +226,25 @@ export default function AccountsPage() {
                   </Table.Cell>
                   
                   <Table.Cell>
-                    <Text size="2" color="gray" style={{ fontFamily: 'monospace' }}>
-                      {maskAccountNumber(account.accountNumber)}
-                    </Text>
+                    <Flex align="center" gap="2">
+                      <Text size="2" color="gray" style={{ fontFamily: 'monospace' }}>
+                        {visibleAccountNumbers.has(account.id) 
+                          ? account.accountNumber 
+                          : maskAccountNumber(account.accountNumber)
+                        }
+                      </Text>
+                      <IconButton 
+                        variant="ghost" 
+                        size="1"
+                        onClick={() => toggleAccountNumberVisibility(account.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {visibleAccountNumbers.has(account.id) 
+                          ? <EyeSlash size={12} /> 
+                          : <Eye size={12} />
+                        }
+                      </IconButton>
+                    </Flex>
                   </Table.Cell>
                   
                   <Table.Cell>

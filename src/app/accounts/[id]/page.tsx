@@ -9,6 +9,8 @@ import { Pencil } from "@phosphor-icons/react/dist/ssr/Pencil"
 import { Check } from "@phosphor-icons/react/dist/ssr/Check"
 import { X } from "@phosphor-icons/react/dist/ssr/X"
 import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard"
+import { Eye } from "@phosphor-icons/react/dist/ssr/Eye"
+import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash"
 import { DashboardLayout } from "@/components/DashboardLayout"
 
 interface Account {
@@ -59,6 +61,7 @@ export default function AccountPage() {
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showFullAccountNumber, setShowFullAccountNumber] = useState(false)
 
   useEffect(() => {
     fetchAccount()
@@ -172,6 +175,15 @@ export default function AccountPage() {
     }
   }
 
+  const maskAccountNumber = (accountNumber: string) => {
+    if (accountNumber.length <= 4) return accountNumber
+    return `****${accountNumber.slice(-4)}`
+  }
+
+  const toggleAccountNumberVisibility = () => {
+    setShowFullAccountNumber(!showFullAccountNumber)
+  }
+
   const backButton = (
     <Button 
       variant="ghost" 
@@ -204,7 +216,27 @@ export default function AccountPage() {
   return (
     <DashboardLayout 
       title={account.nickname}
-      subtitle={`Account ${account.accountNumber} • Created ${formatDate(account.createdAt)}`}
+      subtitle={
+        <Flex align="center" gap="2">
+          <Text size="4" color="gray">
+            Account 
+          </Text>
+          <Text size="4" color="gray" style={{ fontFamily: 'monospace' }}>
+            {showFullAccountNumber ? account.accountNumber : maskAccountNumber(account.accountNumber)}
+          </Text>
+          <IconButton 
+            variant="ghost" 
+            size="1"
+            onClick={toggleAccountNumberVisibility}
+            style={{ cursor: 'pointer' }}
+          >
+            {showFullAccountNumber ? <EyeSlash size={14} /> : <Eye size={14} />}
+          </IconButton>
+          <Text size="4" color="gray">
+            • Created {formatDate(account.createdAt)}
+          </Text>
+        </Flex>
+      }
       action={backButton}
     >
       <Flex direction="column" gap="6">

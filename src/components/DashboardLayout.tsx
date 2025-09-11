@@ -7,7 +7,7 @@ const LAYOUT_MAX_WIDTH = "1200px"
 
 interface DashboardLayoutProps {
   title: string
-  subtitle?: string
+  subtitle?: string | React.ReactNode
   showWelcome?: boolean
   action?: React.ReactNode
   children: React.ReactNode
@@ -40,11 +40,21 @@ export function DashboardLayout({
             <Heading size="7" style={{ marginBottom: "8px" }}>
               {title}
             </Heading>
-            {(subtitle || showWelcome) && (
-              <Text size="4" color="gray">
-                {subtitle || (showWelcome ? `Welcome back, ${user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}.` : '')}
-              </Text>
-            )}
+          {(subtitle || showWelcome) && (
+            <Box>
+              {typeof subtitle === 'string' ? (
+                <Text size="4" color="gray">
+                  {subtitle || (showWelcome ? `Welcome back, ${user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}.` : '')}
+                </Text>
+              ) : subtitle ? (
+                subtitle
+              ) : showWelcome ? (
+                <Text size="4" color="gray">
+                  Welcome back, {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}.
+                </Text>
+              ) : null}
+            </Box>
+          )}
           </Box>
           
           {/* Action Button Area */}
