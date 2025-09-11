@@ -232,7 +232,8 @@ export default function AccountsPage() {
                     <Flex align="center" gap="2">
                       <Text size="2" color="gray" style={{ 
                         fontFamily: 'monospace',
-                        minWidth: '120px',
+                        minWidth: '100px',
+                        letterSpacing: '1px',
                         display: 'inline-block'
                       }}>
                         {visibleAccountNumbers.has(account.id) 

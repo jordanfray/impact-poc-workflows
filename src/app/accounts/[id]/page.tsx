@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Flex, Box, Text, Button, Card, Badge, Table, TextField, IconButton } from "@radix-ui/themes"
+import { Flex, Box, Text, Button, Card, Badge, Table, TextField, IconButton, Dialog } from "@radix-ui/themes"
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft"
 import { Pencil } from "@phosphor-icons/react/dist/ssr/Pencil"
 import { Check } from "@phosphor-icons/react/dist/ssr/Check"
@@ -11,6 +11,7 @@ import { X } from "@phosphor-icons/react/dist/ssr/X"
 import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard"
 import { Eye } from "@phosphor-icons/react/dist/ssr/Eye"
 import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash"
+import { Plus } from "@phosphor-icons/react/dist/ssr/Plus"
 import { DashboardLayout } from "@/components/DashboardLayout"
 
 interface Account {
@@ -62,6 +63,9 @@ export default function AccountPage() {
   const [editedName, setEditedName] = useState('')
   const [saving, setSaving] = useState(false)
   const [showFullAccountNumber, setShowFullAccountNumber] = useState(false)
+  const [showDepositDialog, setShowDepositDialog] = useState(false)
+  const [depositAmount, setDepositAmount] = useState('')
+  const [depositing, setDepositing] = useState(false)
 
   useEffect(() => {
     fetchAccount()
@@ -187,20 +191,88 @@ export default function AccountPage() {
     setShowFullAccountNumber(!showFullAccountNumber)
   }
 
-  const backButton = (
-    <Button 
-      variant="ghost" 
-      onClick={() => router.push('/accounts')}
-      style={{ cursor: 'pointer' }}
-    >
-      <ArrowLeft size={16} />
-      Back to Accounts
-    </Button>
+  const handleDeposit = async () => {
+    const amount = parseFloat(depositAmount)
+    
+    if (!amount || amount <= 0) {
+      setError('Please enter a valid amount')
+      return
+    }
+
+    try {
+      setDepositing(true)
+      setError(null)
+      
+      // Get the current session to get the access token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        setError('No authentication token found')
+        return
+      }
+
+      const response = await fetch(`/api/accounts/${accountId}/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          amount: amount,
+          type: 'DEPOSIT'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to process deposit')
+      }
+
+      const data = await response.json()
+      
+      // Update account with new balance
+      setAccount(prev => prev ? { ...prev, balance: data.account.balance } : null)
+      
+      // Reset form and close dialog
+      setDepositAmount('')
+      setShowDepositDialog(false)
+      
+      // Refresh account data to get updated transactions
+      fetchAccount()
+      
+    } catch (err) {
+      console.error('Error processing deposit:', err)
+      setError('Failed to process deposit')
+    } finally {
+      setDepositing(false)
+    }
+  }
+
+  const actionButtons = (
+    <Flex gap="2">
+      <Button 
+        onClick={() => setShowDepositDialog(true)}
+        style={{ 
+          backgroundColor: 'var(--accent-9)',
+          cursor: 'pointer'
+        }}
+      >
+        <Plus size={16} />
+        Deposit Funds
+      </Button>
+      <Button 
+        variant="ghost" 
+        onClick={() => router.push('/accounts')}
+        style={{ cursor: 'pointer' }}
+      >
+        <ArrowLeft size={16} />
+        Back to Accounts
+      </Button>
+    </Flex>
   )
 
   if (loading) {
     return (
-      <DashboardLayout title="Loading..." action={backButton}>
+      <DashboardLayout title="Loading..." action={actionButtons}>
         <Text>Loading account details...</Text>
       </DashboardLayout>
     )
@@ -208,7 +280,7 @@ export default function AccountPage() {
 
   if (error || !account) {
     return (
-      <DashboardLayout title="Error" action={backButton}>
+      <DashboardLayout title="Error" action={actionButtons}>
         <Card style={{ padding: 20, textAlign: 'center' }}>
           <Text color="red">{error || 'Account not found'}</Text>
         </Card>
@@ -226,7 +298,8 @@ export default function AccountPage() {
           </Text>
           <Text size="4" color="gray" style={{ 
             fontFamily: 'monospace',
-            minWidth: '140px',
+            minWidth: '110px',
+            letterSpacing: '1px',
             display: 'inline-block'
           }}>
             {showFullAccountNumber ? account.accountNumber : maskAccountNumber(account.accountNumber)}
@@ -244,7 +317,7 @@ export default function AccountPage() {
           </Text>
         </Flex>
       }
-      action={backButton}
+      action={actionButtons}
     >
       <Flex direction="column" gap="6">
         {/* Account Name Editing */}
@@ -416,6 +489,53 @@ export default function AccountPage() {
           </Box>
         </Card>
       </Flex>
+
+      {/* Deposit Dialog */}
+      <Dialog.Root open={showDepositDialog} onOpenChange={setShowDepositDialog}>
+        <Dialog.Content style={{ maxWidth: 450 }}>
+          <Dialog.Title>Deposit Funds</Dialog.Title>
+          <Dialog.Description size="2" mb="4">
+            Add funds to your {account.nickname} account via ACH deposit.
+          </Dialog.Description>
+
+          <Flex direction="column" gap="3">
+            <label>
+              <Text as="div" size="2" mb="1" weight="bold">
+                Amount
+              </Text>
+              <TextField.Root
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+              />
+            </label>
+
+            {error && (
+              <Text color="red" size="2">
+                {error}
+              </Text>
+            )}
+          </Flex>
+
+          <Flex gap="3" mt="4" justify="end">
+            <Dialog.Close>
+              <Button variant="soft" color="gray">
+                Cancel
+              </Button>
+            </Dialog.Close>
+            <Button 
+              onClick={handleDeposit}
+              disabled={depositing || !depositAmount}
+              style={{ backgroundColor: 'var(--accent-9)' }}
+            >
+              {depositing ? 'Processing...' : 'Deposit Funds'}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
     </DashboardLayout>
   )
 }
