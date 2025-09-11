@@ -177,7 +177,10 @@ export default function AccountPage() {
 
   const maskAccountNumber = (accountNumber: string) => {
     if (accountNumber.length <= 4) return accountNumber
-    return `****${accountNumber.slice(-4)}`
+    // Add spacing between asterisks and pad to match full number width
+    const lastFour = accountNumber.slice(-4)
+    const maskedPart = '* * * *'
+    return `${maskedPart}${lastFour}`
   }
 
   const toggleAccountNumberVisibility = () => {
@@ -221,7 +224,11 @@ export default function AccountPage() {
           <Text size="4" color="gray">
             Account 
           </Text>
-          <Text size="4" color="gray" style={{ fontFamily: 'monospace' }}>
+          <Text size="4" color="gray" style={{ 
+            fontFamily: 'monospace',
+            minWidth: '140px',
+            display: 'inline-block'
+          }}>
             {showFullAccountNumber ? account.accountNumber : maskAccountNumber(account.accountNumber)}
           </Text>
           <IconButton 

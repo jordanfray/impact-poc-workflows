@@ -116,7 +116,10 @@ export default function AccountsPage() {
 
   const maskAccountNumber = (accountNumber: string) => {
     if (accountNumber.length <= 4) return accountNumber
-    return `****${accountNumber.slice(-4)}`
+    // Add spacing between asterisks and pad to match full number width
+    const lastFour = accountNumber.slice(-4)
+    const maskedPart = '* * * *'
+    return `${maskedPart}${lastFour}`
   }
 
   const toggleAccountNumberVisibility = (accountId: string) => {
@@ -227,7 +230,11 @@ export default function AccountsPage() {
                   
                   <Table.Cell>
                     <Flex align="center" gap="2">
-                      <Text size="2" color="gray" style={{ fontFamily: 'monospace' }}>
+                      <Text size="2" color="gray" style={{ 
+                        fontFamily: 'monospace',
+                        minWidth: '120px',
+                        display: 'inline-block'
+                      }}>
                         {visibleAccountNumbers.has(account.id) 
                           ? account.accountNumber 
                           : maskAccountNumber(account.accountNumber)
