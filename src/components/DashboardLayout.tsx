@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider"
 interface DashboardLayoutProps {
   title: string
   subtitle?: string
+  showWelcome?: boolean
   children: React.ReactNode
   maxWidth?: string
 }
@@ -13,6 +14,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ 
   title, 
   subtitle, 
+  showWelcome = false,
   children, 
   maxWidth = "1200px" 
 }: DashboardLayoutProps) {
@@ -26,9 +28,11 @@ export function DashboardLayout({
           <Heading size="7" style={{ marginBottom: "8px" }}>
             {title}
           </Heading>
-          <Text size="4" color="gray">
-            {subtitle || `Welcome back, ${user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}.`}
-          </Text>
+          {(subtitle || showWelcome) && (
+            <Text size="4" color="gray">
+              {subtitle || (showWelcome ? `Welcome back, ${user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}.` : '')}
+            </Text>
+          )}
         </Box>
 
         {/* Page Content */}

@@ -13,7 +13,7 @@ import {
 
 export default function Home() {
   return (
-    <DashboardLayout title="Dashboard">
+    <DashboardLayout title="Dashboard" showWelcome={true}>
 
       {/* Main Content Grid */}
       <Grid columns="3" gap="6">

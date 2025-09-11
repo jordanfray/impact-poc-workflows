@@ -53,22 +53,10 @@ export default function AccountsPage() {
   }
 
   return (
-    <DashboardLayout title="Accounts">
+    <DashboardLayout title="Accounts" subtitle="Manage your banking accounts and view balances">
       <Flex direction="column" gap="6">
         {/* Header with Create Button */}
-        <Flex justify="between" align="center">
-          <Box>
-            <Text size="6" weight="bold" style={{ 
-              fontFamily: 'F37Jan',
-              color: 'var(--gray-12)'
-            }}>
-              Bank Accounts
-            </Text>
-            <Text size="3" color="gray" style={{ marginTop: 4 }}>
-              Manage your banking accounts and view balances
-            </Text>
-          </Box>
-          
+        <Flex justify="end" align="center">
           <Button 
             size="3"
             style={{ 
