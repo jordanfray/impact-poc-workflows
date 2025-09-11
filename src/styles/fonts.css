@@ -1,4 +1,9 @@
+/* Import Google Fonts as a fallback for F37Jan */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
 /* F37Jan Font Family - For Headings */
+/* Note: F37Jan font files are not included in this repository due to licensing */
+/* Using Space Grotesk as a similar alternative with Inter as additional fallback */
 @font-face {
   font-family: 'F37Jan';
   src: url('/fonts/f37-jan/F37Jan-Thin.otf') format('opentype');
@@ -228,8 +233,8 @@
 
 /* CSS Custom Properties for Font Families */
 :root {
-  --font-heading: 'F37Jan', Georgia, 'Times New Roman', serif;
-  --font-body: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'F37Jan', 'Space Grotesk', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Base styles */

@@ -213,3 +213,35 @@ npm run prisma:migrate
 ---
 
 **Note**: This setup creates a completely isolated environment for this POC. Your existing Docker/Supabase setups won't be affected.
+
+---
+
+## 🎨 Fonts Configuration
+
+### Font Files Not Included
+The original design uses **F37Jan** and **Poppins** fonts, but the font files are not included in this repository due to:
+- Licensing restrictions (F37Jan is a commercial font)
+- File size considerations
+- Repository portability
+
+### Current Fallbacks
+The application will gracefully fallback to:
+- **Headings**: Space Grotesk → Inter → system fonts
+- **Body text**: Inter → system fonts
+
+### Adding Original Fonts (Optional)
+If you have licenses for the original fonts:
+
+1. **F37Jan fonts**: Place in `public/fonts/f37-jan/`
+   - F37Jan-Regular.otf
+   - F37Jan-Bold.otf
+   - F37Jan-Light.otf
+   - (and other weights as needed)
+
+2. **Poppins fonts**: Place in `public/fonts/poppins/Web Fonts/Poppins/`
+   - Poppins-Regular.woff2
+   - Poppins-Bold.woff2
+   - Poppins-Medium.woff2
+   - (and other weights as needed)
+
+3. **Restart the dev server** after adding fonts
