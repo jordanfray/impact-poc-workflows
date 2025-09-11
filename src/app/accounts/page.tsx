@@ -1,41 +1,100 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import { Flex, Box, Text, Button, Card, Badge, Table } from "@radix-ui/themes"
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus"
 import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard"
 import { DashboardLayout } from "@/components/DashboardLayout"
 
-// Mock data for now - we'll replace with real API calls later
-const mockAccounts = [
-  {
-    id: '1',
-    nickname: 'Primary Checking',
-    accountNumber: '****1234',
-    balance: 2450.75,
-    createdAt: '2024-01-15',
-    status: 'active'
-  },
-  {
-    id: '2',
-    nickname: 'Savings Account',
-    accountNumber: '****5678',
-    balance: 15750.00,
-    createdAt: '2024-01-20',
-    status: 'active'
-  },
-  {
-    id: '3',
-    nickname: 'Business Account',
-    accountNumber: '****9012',
-    balance: 8925.50,
-    createdAt: '2024-02-01',
-    status: 'active'
+interface Account {
+  id: string
+  nickname: string
+  accountNumber: string
+  balance: number
+  createdAt: string
+  updatedAt: string
+  _count?: {
+    transactions: number
+    cards: number
   }
-]
+}
 
 export default function AccountsPage() {
-  const [accounts] = useState(mockAccounts)
+  const router = useRouter()
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [])
+
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true)
+      
+      // Get the current session to get the access token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        console.error('No authentication token found')
+        return
+      }
+
+      const response = await fetch('/api/accounts', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setAccounts(data.accounts)
+      } else {
+        console.error('Failed to fetch accounts')
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateAccount = async () => {
+    try {
+      setCreating(true)
+      
+      // Get the current session to get the access token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        console.error('No authentication token found')
+        return
+      }
+
+      const response = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Navigate to the new account page
+        router.push(`/accounts/${data.account.id}`)
+      } else {
+        console.error('Failed to create account')
+      }
+    } catch (error) {
+      console.error('Error creating account:', error)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -52,23 +111,37 @@ export default function AccountsPage() {
     })
   }
 
-  return (
-    <DashboardLayout title="Accounts" subtitle="Manage your banking accounts and view balances">
-      <Flex direction="column" gap="6">
-        {/* Header with Create Button */}
-        <Flex justify="end" align="center">
-          <Button 
-            size="3"
-            style={{ 
-              backgroundColor: 'var(--accent-9)',
-              cursor: 'pointer'
-            }}
-          >
-            <Plus size={16} />
-            Create Account
-          </Button>
-        </Flex>
+  const maskAccountNumber = (accountNumber: string) => {
+    if (accountNumber.length <= 4) return accountNumber
+    return `****${accountNumber.slice(-4)}`
+  }
 
+  const createAccountButton = (
+    <Button 
+      size="3"
+      onClick={handleCreateAccount}
+      disabled={creating}
+      style={{ 
+        backgroundColor: 'var(--accent-9)',
+        cursor: 'pointer'
+      }}
+    >
+      <Plus size={16} />
+      {creating ? 'Creating...' : 'Create Account'}
+    </Button>
+  )
+
+  return (
+    <DashboardLayout 
+      title="Accounts" 
+      subtitle="Manage your banking accounts and view balances"
+      action={createAccountButton}
+    >
+      <Flex direction="column" gap="6">
+        {loading ? (
+          <Text>Loading accounts...</Text>
+        ) : (
+          <>
         {/* Accounts Summary Cards */}
         <Flex gap="4" wrap="wrap">
           <Card style={{ minWidth: 200, flex: 1 }}>
@@ -83,9 +156,9 @@ export default function AccountsPage() {
           <Card style={{ minWidth: 200, flex: 1 }}>
             <Flex direction="column" gap="2">
               <Text size="2" color="gray">Active Accounts</Text>
-              <Text size="5" weight="bold" style={{ fontFamily: 'F37Jan' }}>
-                {accounts.filter(acc => acc.status === 'active').length}
-              </Text>
+            <Text size="5" weight="bold" style={{ fontFamily: 'F37Jan' }}>
+              {accounts.length}
+            </Text>
             </Flex>
           </Card>
           
@@ -141,7 +214,7 @@ export default function AccountsPage() {
                   
                   <Table.Cell>
                     <Text size="2" color="gray" style={{ fontFamily: 'monospace' }}>
-                      {account.accountNumber}
+                      {maskAccountNumber(account.accountNumber)}
                     </Text>
                   </Table.Cell>
                   
@@ -162,15 +235,20 @@ export default function AccountsPage() {
                   
                   <Table.Cell>
                     <Badge 
-                      color={account.status === 'active' ? 'green' : 'gray'}
+                      color="green"
                       variant="soft"
                     >
-                      {account.status}
+                      active
                     </Badge>
                   </Table.Cell>
                   
                   <Table.Cell>
-                    <Button size="1" variant="ghost">
+                    <Button 
+                      size="1" 
+                      variant="ghost"
+                      onClick={() => router.push(`/accounts/${account.id}`)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       View Details
                     </Button>
                   </Table.Cell>
@@ -207,12 +285,19 @@ export default function AccountsPage() {
                 </Text>
               </Box>
               
-              <Button size="3" style={{ backgroundColor: 'var(--accent-9)' }}>
+              <Button 
+                size="3" 
+                onClick={handleCreateAccount}
+                disabled={creating}
+                style={{ backgroundColor: 'var(--accent-9)', cursor: 'pointer' }}
+              >
                 <Plus size={16} />
-                Create Your First Account
+                {creating ? 'Creating...' : 'Create Your First Account'}
               </Button>
             </Flex>
           </Card>
+        )}
+          </>
         )}
       </Flex>
     </DashboardLayout>
