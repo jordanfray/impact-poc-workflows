@@ -13,7 +13,17 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:restart": "supabase stop && supabase start",
+    "supabase:reset": "supabase db reset",
+    "supabase:studio": "supabase studio",
+    "supabase:status": "supabase status",
+    "db:setup": "supabase start && prisma generate && prisma db push",
+    "dev:full": "npm run db:setup && npm run dev",
+    "setup:env": "./setup-env.sh",
+    "setup:storage": "./setup-storage.sh"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
