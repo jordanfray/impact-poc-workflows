@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # n8n automation platform
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n_poc
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password123
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      # Connect to your existing database
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=127.0.0.1
+      - DB_POSTGRESDB_PORT=54332
+      - DB_POSTGRESDB_DATABASE=postgres
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=postgres
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - n8n_network
+
+volumes:
+  n8n_data:
+
+networks:
+  n8n_network:
+    driver: bridge

@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createClient } from '@supabase/supabase-js'
+import { n8nAutomation } from '@/lib/n8n-integration'
 
 // POST /api/accounts/[id]/transactions - Create a new transaction (deposit)
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   console.log('🔄 POST /api/accounts/[id]/transactions called')
-  console.log('📋 Request params:', params)
+
+  const { id } = await params
+  console.log('📋 Request params:', { id })
   
   try {
     // Get auth header
@@ -64,10 +67,10 @@ export async function POST(
     }
 
     // Verify user has access to this account
-    console.log('🏦 Checking account access...', { accountId: params.id, userId: user.id })
+    console.log('🏦 Checking account access...', { accountId: id, userId: user.id })
     const account = await prisma.account.findFirst({
       where: {
-        id: params.id,
+        id: id,
         users: {
           some: {
             userId: user.id
@@ -89,7 +92,7 @@ export async function POST(
       // Create the transaction record
       const transaction = await tx.transaction.create({
         data: {
-          accountId: params.id,
+          accountId: id,
           amount: type === 'WITHDRAWAL' ? -Math.abs(amount) : Math.abs(amount),
           type: type as 'DEPOSIT' | 'WITHDRAWAL',
           status: 'CLEARED' // ACH deposits are immediately cleared for demo purposes
@@ -101,7 +104,7 @@ export async function POST(
       // Update account balance
       const updatedAccount = await tx.account.update({
         where: {
-          id: params.id
+          id: id
         },
         data: {
           balance: {
@@ -115,6 +118,26 @@ export async function POST(
     })
 
     console.log(`✅ ${type} transaction created: $${amount} for account ${account.nickname} (${user.email})`)
+
+    // Trigger n8n automation workflows
+    try {
+      await n8nAutomation.onTransactionCreated(result.transaction, result.account)
+
+      // Check for low balance after withdrawal
+      if (type === 'WITHDRAWAL') {
+        const currentBalance = Number(result.account.balance)
+        const lowBalanceThreshold = 100 // $100 threshold
+
+        if (currentBalance < lowBalanceThreshold) {
+          await n8nAutomation.onLowBalance(id, currentBalance, lowBalanceThreshold)
+        }
+      }
+      
+      console.log('🤖 n8n automation triggered successfully')
+    } catch (error) {
+      console.warn('⚠️ n8n automation failed (non-blocking):', error)
+      // Don't fail the transaction if automation fails
+    }
 
     const responseData = {
       transaction: result.transaction,
@@ -175,7 +198,7 @@ export async function GET(
     // Verify user has access to this account
     const account = await prisma.account.findFirst({
       where: {
-        id: params.id,
+        id: id,
         users: {
           some: {
             userId: user.id
@@ -196,7 +219,7 @@ export async function GET(
     // Get transactions for this account
     const transactions = await prisma.transaction.findMany({
       where: {
-        accountId: params.id
+        accountId: id
       },
       include: {
         card: true,

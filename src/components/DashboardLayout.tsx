@@ -1,7 +1,9 @@
 'use client'
 
-import { Heading, Text, Flex, Box } from "@radix-ui/themes"
+import { Heading, Text, Flex, Box, Link } from "@radix-ui/themes"
 import { useAuth } from "@/components/AuthProvider"
+import { ArrowLeft } from "@phosphor-icons/react/dist/ssr/ArrowLeft"
+import { useRouter } from "next/navigation"
 // import { LAYOUT_MAX_WIDTH } from "@/lib/constants"
 const LAYOUT_MAX_WIDTH = "1200px"
 
@@ -10,6 +12,10 @@ interface DashboardLayoutProps {
   subtitle?: string | React.ReactNode
   showWelcome?: boolean
   action?: React.ReactNode
+  breadcrumb?: {
+    label: string
+    href: string
+  }
   children: React.ReactNode
   maxWidth?: string
 }
@@ -19,10 +25,12 @@ export function DashboardLayout({
   subtitle, 
   showWelcome = false,
   action,
+  breadcrumb,
   children, 
   maxWidth = LAYOUT_MAX_WIDTH 
 }: DashboardLayoutProps) {
   const { user } = useAuth()
+  const router = useRouter()
 
   return (
     <Box 
@@ -34,6 +42,26 @@ export function DashboardLayout({
       }}
     >
       <Flex direction="column" gap="6">
+        {/* Breadcrumb */}
+        {breadcrumb && (
+          <Box>
+            <Link 
+              onClick={() => router.push(breadcrumb.href)}
+              style={{ 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: 'var(--gray-11)',
+                textDecoration: 'none'
+              }}
+            >
+              <ArrowLeft size={16} />
+              <Text size="3">{breadcrumb.label}</Text>
+            </Link>
+          </Box>
+        )}
+
         {/* Page Header */}
         <Flex justify="between" align="start" gap="4">
           <Box style={{ flex: 1 }}>

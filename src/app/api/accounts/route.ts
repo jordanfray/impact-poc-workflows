@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createClient } from '@supabase/supabase-js'
+import { n8nAutomation } from '@/lib/n8n-integration'
 
 // Generate a random account number (for demo purposes)
 function generateAccountNumber(): string {
@@ -114,16 +115,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's existing account count for nickname generation
-    const existingAccountsCount = await prisma.accountUser.count({
-      where: {
-        userId: user.id
-      }
-    })
+    // Parse request body for optional nickname
+    let requestBody: { nickname?: string } = {}
+    try {
+      requestBody = await request.json()
+    } catch {
+      // If no body or invalid JSON, use empty object
+    }
 
     // Generate account details
     const accountNumber = generateAccountNumber()
-    const nickname = generateDefaultNickname(existingAccountsCount)
+    let nickname = requestBody.nickname?.trim()
+    
+    // If no nickname provided, generate a default one
+    if (!nickname) {
+      const existingAccountsCount = await prisma.accountUser.count({
+        where: {
+          userId: user.id
+        }
+      })
+      nickname = generateDefaultNickname(existingAccountsCount)
+    }
 
     // Create the account and link it to the user in a transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -148,6 +160,14 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`✅ Account created: ${result.nickname} (${result.accountNumber}) for user ${user.email}`)
+
+    // Trigger n8n automation for new account
+    try {
+      await n8nAutomation.onAccountCreated(result)
+      console.log('🤖 n8n account creation automation triggered')
+    } catch (error) {
+      console.warn('⚠️ n8n automation failed (non-blocking):', error)
+    }
 
     return NextResponse.json({ 
       account: result,

@@ -22,6 +22,7 @@ enum TransactionStatus {
 enum TransactionType {
   DEPOSIT
   WITHDRAWAL
+  TRANSFER
   CHECK_PAYMENT
   CARD_PAYMENT
 }
@@ -59,6 +60,10 @@ model Account {
   users        AccountUser[]
   transactions Transaction[]
   cards        Card[]
+  
+  // Transfer relationships
+  transfersFrom Transaction[] @relation("TransferFrom")
+  transfersTo   Transaction[] @relation("TransferTo")
 
   @@map("accounts")
 }
@@ -87,11 +92,17 @@ model Transaction {
   // Optional relationships
   cardId  String?
   checkId String?
+  
+  // Transfer relationships
+  transferFromAccountId String? // For TRANSFER type: source account
+  transferToAccountId   String? // For TRANSFER type: destination account
 
   // Relations
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  card    Card?   @relation(fields: [cardId], references: [id])
-  check   Check?  @relation(fields: [checkId], references: [id])
+  account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card              Card?    @relation(fields: [cardId], references: [id])
+  check             Check?   @relation(fields: [checkId], references: [id])
+  transferFromAccount Account? @relation("TransferFrom", fields: [transferFromAccountId], references: [id])
+  transferToAccount   Account? @relation("TransferTo", fields: [transferToAccountId], references: [id])
 
   @@map("transactions")
 }

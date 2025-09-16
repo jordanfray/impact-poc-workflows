@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Flex, Box, Text, Button, Card, Badge, Table, IconButton } from "@radix-ui/themes"
+import { Flex, Box, Text, Button, Card, Badge, Table, IconButton, DropdownMenu, Dialog, TextField } from "@radix-ui/themes"
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus"
 import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard"
+import { DotsThree } from "@phosphor-icons/react/dist/ssr/DotsThree"
+import { ArrowUp } from "@phosphor-icons/react/dist/ssr/ArrowUp"
+import { ArrowRight } from "@phosphor-icons/react/dist/ssr/ArrowRight"
 import { Eye } from "@phosphor-icons/react/dist/ssr/Eye"
-import { EyeSlash } from "@phosphor-icons/react/dist/ssr/EyeSlash"
 import { DashboardLayout } from "@/components/DashboardLayout"
+import { TransferModal } from "@/components/TransferModal"
+import { formatCurrency } from '@/lib/utils'
 
 interface Account {
   id: string
@@ -28,7 +32,10 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [visibleAccountNumbers, setVisibleAccountNumbers] = useState<Set<string>>(new Set())
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [newAccountName, setNewAccountName] = useState('')
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferFromAccountId, setTransferFromAccountId] = useState<string | undefined>()
 
   useEffect(() => {
     fetchAccounts()
@@ -66,6 +73,10 @@ export default function AccountsPage() {
   }
 
   const handleCreateAccount = async () => {
+    if (!newAccountName.trim()) {
+      return // Don't create without a name
+    }
+
     try {
       setCreating(true)
       
@@ -82,11 +93,17 @@ export default function AccountsPage() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
-        }
+        },
+        body: JSON.stringify({
+          nickname: newAccountName.trim()
+        })
       })
 
       if (response.ok) {
         const data = await response.json()
+        // Reset form and close dialog
+        setNewAccountName('')
+        setShowCreateDialog(false)
         // Navigate to the new account page
         router.push(`/accounts/${data.account.id}`)
       } else {
@@ -99,51 +116,18 @@ export default function AccountsPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount)
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const maskAccountNumber = (accountNumber: string) => {
-    if (accountNumber.length <= 4) return accountNumber
-    // Add spacing between asterisks and pad to match full number width
-    const lastFour = accountNumber.slice(-4)
-    const maskedPart = '* * * *'
-    return `${maskedPart}${lastFour}`
-  }
-
-  const toggleAccountNumberVisibility = (accountId: string) => {
-    const newVisibleNumbers = new Set(visibleAccountNumbers)
-    if (newVisibleNumbers.has(accountId)) {
-      newVisibleNumbers.delete(accountId)
-    } else {
-      newVisibleNumbers.add(accountId)
-    }
-    setVisibleAccountNumbers(newVisibleNumbers)
-  }
 
   const createAccountButton = (
     <Button 
       size="3"
-      onClick={handleCreateAccount}
-      disabled={creating}
+      onClick={() => setShowCreateDialog(true)}
       style={{ 
         backgroundColor: 'var(--accent-9)',
         cursor: 'pointer'
       }}
     >
       <Plus size={16} />
-      {creating ? 'Creating...' : 'Create Account'}
+      Create Account
     </Button>
   )
 
@@ -158,64 +142,31 @@ export default function AccountsPage() {
           <Text>Loading accounts...</Text>
         ) : (
           <>
-        {/* Accounts Summary Cards */}
-        <Flex gap="4" wrap="wrap">
-          <Card style={{ minWidth: 200, flex: 1 }}>
-            <Flex direction="column" gap="2">
-              <Text size="2" color="gray">Total Balance</Text>
-              <Text size="5" weight="bold" style={{ fontFamily: 'F37Jan' }}>
-                {formatCurrency(accounts.reduce((sum, acc) => sum + acc.balance, 0))}
-              </Text>
-            </Flex>
-          </Card>
-          
-          <Card style={{ minWidth: 200, flex: 1 }}>
-            <Flex direction="column" gap="2">
-              <Text size="2" color="gray">Active Accounts</Text>
-            <Text size="5" weight="bold" style={{ fontFamily: 'F37Jan' }}>
-              {accounts.length}
-            </Text>
-            </Flex>
-          </Card>
-          
-          <Card style={{ minWidth: 200, flex: 1 }}>
-            <Flex direction="column" gap="2">
-              <Text size="2" color="gray">Average Balance</Text>
-              <Text size="5" weight="bold" style={{ fontFamily: 'F37Jan' }}>
-                {formatCurrency(accounts.reduce((sum, acc) => sum + acc.balance, 0) / accounts.length)}
-              </Text>
-            </Flex>
-          </Card>
-        </Flex>
-
         {/* Accounts Table */}
         <Card>
           <Table.Root>
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeaderCell>Account</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Account Number</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Balance</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Created</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell>Actions</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell align="right">Balance</Table.ColumnHeaderCell>
+                <Table.ColumnHeaderCell width="48px"></Table.ColumnHeaderCell>
               </Table.Row>
             </Table.Header>
 
             <Table.Body>
               {accounts.map((account) => (
-                <Table.Row key={account.id}>
+                <Table.Row key={account.id} style={{ cursor: 'pointer' }} onClick={() => router.push(`/accounts/${account.id}`)}>
                   <Table.Cell>
                     <Flex align="center" gap="3">
                       <Box style={{ 
                         backgroundColor: 'var(--accent-3)',
                         borderRadius: 8,
-                        padding: 8,
+                        padding: 12,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
-                        <CreditCard size={16} color="var(--accent-11)" />
+                        <CreditCard size={20} color="var(--accent-11)" />
                       </Box>
                       <Box>
                         <Text size="3" weight="medium" style={{ 
@@ -224,70 +175,68 @@ export default function AccountsPage() {
                         }}>
                           {account.nickname}
                         </Text>
+                        <Text size="2" color="gray" style={{ 
+                          fontFamily: 'monospace',
+                          letterSpacing: '0.5px'
+                        }}>
+                          ••••{account.accountNumber.slice(-4)}
+                        </Text>
                       </Box>
                     </Flex>
                   </Table.Cell>
-                  
-                  <Table.Cell>
-                    <Flex align="center" gap="2">
-                      <Text size="2" color="gray" style={{ 
-                        fontFamily: 'monospace',
-                        minWidth: '100px',
-                        letterSpacing: '1px',
-                        display: 'inline-block'
-                      }}>
-                        {visibleAccountNumbers.has(account.id) 
-                          ? account.accountNumber 
-                          : maskAccountNumber(account.accountNumber)
-                        }
-                      </Text>
-                      <IconButton 
-                        variant="ghost" 
-                        size="1"
-                        onClick={() => toggleAccountNumberVisibility(account.id)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {visibleAccountNumbers.has(account.id) 
-                          ? <EyeSlash size={12} /> 
-                          : <Eye size={12} />
-                        }
-                      </IconButton>
-                    </Flex>
-                  </Table.Cell>
-                  
-                  <Table.Cell>
-                    <Text size="3" weight="medium" style={{ 
+
+                  <Table.Cell align="right">
+                    <Text size="4" weight="medium" style={{ 
                       fontFamily: 'F37Jan',
-                      color: account.balance > 0 ? 'var(--green-11)' : 'var(--red-11)'
+                      color: 'var(--gray-12)'
                     }}>
                       {formatCurrency(account.balance)}
                     </Text>
                   </Table.Cell>
-                  
+
                   <Table.Cell>
-                    <Text size="2" color="gray">
-                      {formatDate(account.createdAt)}
-                    </Text>
-                  </Table.Cell>
-                  
-                  <Table.Cell>
-                    <Badge 
-                      color="green"
-                      variant="soft"
-                    >
-                      active
-                    </Badge>
-                  </Table.Cell>
-                  
-                  <Table.Cell>
-                    <Button 
-                      size="1" 
-                      variant="ghost"
-                      onClick={() => router.push(`/accounts/${account.id}`)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      View Details
-                    </Button>
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger>
+                        <IconButton
+                          size="2"
+                          variant="ghost"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <DotsThree size={16} />
+                        </IconButton>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Content>
+                        <DropdownMenu.Item onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/accounts/${account.id}`)
+                        }}>
+                          <Flex align="center" gap="2">
+                            <Eye size={14} />
+                            View Details
+                          </Flex>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item onClick={(e) => {
+                          e.stopPropagation()
+                          // TODO: Implement quick deposit
+                          console.log('Quick deposit for account:', account.id)
+                        }}>
+                          <Flex align="center" gap="2">
+                            <ArrowUp size={14} />
+                            Deposit
+                          </Flex>
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item onClick={(e) => {
+                          e.stopPropagation()
+                          setTransferFromAccountId(account.id)
+                          setShowTransferModal(true)
+                        }}>
+                          <Flex align="center" gap="2">
+                            <ArrowRight size={14} />
+                            Transfer
+                          </Flex>
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Root>
                   </Table.Cell>
                 </Table.Row>
               ))}
@@ -324,12 +273,11 @@ export default function AccountsPage() {
               
               <Button 
                 size="3" 
-                onClick={handleCreateAccount}
-                disabled={creating}
+                onClick={() => setShowCreateDialog(true)}
                 style={{ backgroundColor: 'var(--accent-9)', cursor: 'pointer' }}
               >
                 <Plus size={16} />
-                {creating ? 'Creating...' : 'Create Your First Account'}
+                Create Your First Account
               </Button>
             </Flex>
           </Card>
@@ -337,6 +285,63 @@ export default function AccountsPage() {
           </>
         )}
       </Flex>
+
+      {/* Create Account Dialog */}
+      <Dialog.Root open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <Dialog.Content style={{ maxWidth: 450 }}>
+          <Dialog.Title>Create New Account</Dialog.Title>
+          <Dialog.Description size="2" mb="4">
+            Enter a name for your new banking account.
+          </Dialog.Description>
+
+          <Flex direction="column" gap="3">
+            <label>
+              <Text as="div" size="2" mb="1" weight="bold">
+                Account Name
+              </Text>
+              <TextField.Root
+                placeholder="e.g. Personal Checking, Savings, etc."
+                value={newAccountName}
+                onChange={(e) => setNewAccountName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newAccountName.trim()) {
+                    handleCreateAccount()
+                  }
+                }}
+              />
+            </label>
+
+            <Flex gap="3" mt="4" justify="end">
+              <Dialog.Close>
+                <Button variant="soft" color="gray">
+                  Cancel
+                </Button>
+              </Dialog.Close>
+              <Button 
+                onClick={handleCreateAccount}
+                disabled={creating || !newAccountName.trim()}
+                style={{ 
+                  backgroundColor: 'var(--accent-9)',
+                  cursor: 'pointer'
+                }}
+              >
+                {creating ? 'Creating...' : 'Create Account'}
+              </Button>
+            </Flex>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Transfer Modal */}
+      <TransferModal 
+        isOpen={showTransferModal}
+        onClose={() => {
+          setShowTransferModal(false)
+          setTransferFromAccountId(undefined)
+        }}
+        preselectedFromAccountId={transferFromAccountId}
+        onTransferComplete={fetchAccounts}
+      />
     </DashboardLayout>
   )
 }
