@@ -2,7 +2,7 @@
 
 import { Flex, Text, Link, Box, Button, DropdownMenu, Avatar } from "@radix-ui/themes";
 import { House } from "@phosphor-icons/react/dist/ssr/House";
-import { Database } from "@phosphor-icons/react/dist/ssr/Database";
+import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard";
 import { SignOut } from "@phosphor-icons/react/dist/ssr/SignOut";
 import { User } from "@phosphor-icons/react/dist/ssr/User";
 import { UserGear } from "@phosphor-icons/react/dist/ssr/UserGear";
@@ -88,8 +88,8 @@ export function Sidebar() {
           </Link>
 
 
-          {/* Supabase Studio */}
-          <Link href="http://localhost:54323" target="_blank">
+          {/* Accounts */}
+          <Link href="/accounts">
             <Box
               style={{
                 padding: 12,
@@ -101,7 +101,7 @@ export function Sidebar() {
             >
               <Flex align="center" gap="3">
                 <Box style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Database size={20} color="var(--gray-12)" />
+                  <CreditCard size={20} color="var(--gray-12)" />
                 </Box>
                 <Text size="3" weight="medium" style={{
                   color: 'var(--gray-12)',
@@ -110,7 +110,7 @@ export function Sidebar() {
                   fontWeight: 400,
                   lineHeight: '24px',
                 }}>
-                  Supabase Studio
+                  Accounts
                 </Text>
               </Flex>
             </Box>

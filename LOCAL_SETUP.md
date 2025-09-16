@@ -152,10 +152,39 @@ npm run supabase:status   # Check status of all services
 
 ### Database Management
 ```bash
-npm run prisma:generate   # Generate Prisma client
-npm run prisma:migrate    # Create and apply migrations
-npm run prisma:studio     # Open Prisma Studio
-npm run db:setup          # Complete database setup
+npm run prisma:generate         # Generate Prisma client
+npm run prisma:migrate          # Create and apply new migration
+npm run prisma:migrate:status   # Check migration status
+npm run prisma:migrate:deploy   # Apply pending migrations (production)
+npm run prisma:studio           # Open Prisma Studio
+npm run db:setup                # Complete database setup
+```
+
+#### Migration Workflow
+When you change the Prisma schema:
+
+1. **Create a new migration**:
+   ```bash
+   npm run prisma:migrate
+   # This will prompt you to name the migration
+   ```
+
+2. **Check migration status**:
+   ```bash
+   npm run prisma:migrate:status
+   ```
+
+3. **Generate Prisma client** (if not done automatically):
+   ```bash
+   npm run prisma:generate
+   ```
+
+#### Emergency Database Operations
+⚠️ **Use with caution - these will delete data!**
+
+```bash
+npm run prisma:migrate:reset     # Reset database and apply all migrations
+npm run supabase:reset           # Reset entire Supabase instance
 ```
 
 ### Storage Management

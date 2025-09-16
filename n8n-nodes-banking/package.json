@@ -1,0 +1,54 @@
+{
+  "name": "n8n-nodes-impact",
+  "version": "1.0.0",
+  "description": "Custom n8n nodes for Gloo Impact banking operations",
+  "keywords": [
+    "n8n-community-node-package"
+  ],
+  "license": "MIT",
+  "homepage": "",
+  "author": {
+    "name": "Gloo Impact",
+    "email": "impact@gloo.us"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gloo/impact-poc-workflows.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "format": "prettier nodes --write",
+    "lint": "eslint nodes package.json",
+    "lintfix": "eslint nodes package.json --fix",
+    "prepublishOnly": "npm run build && npm run lint -s"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/BankingApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/BankingTransfer/BankingTransfer.node.js",
+      "dist/nodes/BankingAccount/BankingAccount.node.js",
+      "dist/nodes/BankingNotification/BankingNotification.node.js",
+      "dist/nodes/BankingTrigger/BankingTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.29.0",
+    "eslint-plugin-n8n-nodes-base": "^1.11.0",
+    "gulp": "^4.0.2",
+    "n8n-workflow": "*",
+    "prettier": "^2.7.1",
+    "typescript": "^4.8.4"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}

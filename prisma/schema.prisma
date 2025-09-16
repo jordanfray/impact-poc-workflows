@@ -13,6 +13,26 @@ enum UserRole {
   USER
 }
 
+enum TransactionStatus {
+  PENDING
+  DECLINED
+  CLEARED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  CHECK_PAYMENT
+  CARD_PAYMENT
+}
+
+enum CheckStatus {
+  PENDING
+  CANCELED
+  DEPOSITED
+}
+
 model User {
   id        String   @id // Supabase Auth UUID
   email     String   @unique
@@ -22,5 +42,116 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Banking relationships
+  accounts  AccountUser[]
+
   @@map("users")
+}
+
+model Account {
+  id            String   @id @default(cuid())
+  nickname      String
+  accountNumber String   @unique
+  balance       Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  users        AccountUser[]
+  transactions Transaction[]
+  cards        Card[]
+  
+  // Transfer relationships
+  transfersFrom Transaction[] @relation("TransferFrom")
+  transfersTo   Transaction[] @relation("TransferTo")
+
+  @@map("accounts")
+}
+
+model AccountUser {
+  id        String @id @default(cuid())
+  userId    String
+  accountId String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, accountId])
+  @@map("account_users")
+}
+
+model Transaction {
+  id        String            @id @default(cuid())
+  accountId String
+  amount    Decimal           @db.Decimal(12, 2)
+  type      TransactionType
+  status    TransactionStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  // Optional relationships
+  cardId  String?
+  checkId String?
+  
+  // Transfer relationships
+  transferFromAccountId String? // For TRANSFER type: source account
+  transferToAccountId   String? // For TRANSFER type: destination account
+
+  // Relations
+  account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card              Card?    @relation(fields: [cardId], references: [id])
+  check             Check?   @relation(fields: [checkId], references: [id])
+  transferFromAccount Account? @relation("TransferFrom", fields: [transferFromAccountId], references: [id])
+  transferToAccount   Account? @relation("TransferTo", fields: [transferToAccountId], references: [id])
+
+  @@map("transactions")
+}
+
+model Card {
+  id            String   @id @default(cuid())
+  accountId     String
+  cardNumber    String   @unique // Last 4 digits or masked number
+  cardholderName String
+  expiryMonth   Int
+  expiryYear    Int
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("cards")
+}
+
+model Recipient {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  checks Check[]
+
+  @@map("recipients")
+}
+
+model Check {
+  id          String      @id @default(cuid())
+  recipientId String
+  amount      Decimal     @db.Decimal(12, 2)
+  memo        String?
+  status      CheckStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  recipient    Recipient     @relation(fields: [recipientId], references: [id])
+  transactions Transaction[]
+
+  @@map("checks")
 }
