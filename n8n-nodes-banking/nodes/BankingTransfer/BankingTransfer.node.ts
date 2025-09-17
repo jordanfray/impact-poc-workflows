@@ -111,7 +111,16 @@ export class BankingTransfer implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 		const operation = this.getNodeParameter('operation', 0);
 
+		// Generate or reuse a correlation id for this workflow run
+		const globalData = this.getWorkflowStaticData('global') as any;
+		let correlationId = (globalData && globalData.correlationId) as string;
+		if (!correlationId) {
+			correlationId = `${this.getNode().id}:${Date.now()}`;
+			if (globalData) globalData.correlationId = correlationId;
+		}
+
 		for (let i = 0; i < items.length; i++) {
+			const idempotencyKey = `${correlationId}:${i}:${operation}`;
 			try {
 				if (operation === 'transfer') {
 					const fromAccountId = this.getNodeParameter('fromAccountId', i) as string;
@@ -133,6 +142,8 @@ export class BankingTransfer implements INodeType {
 						headers: {
 							'Authorization': `Bearer ${apiKey}`,
 							'Content-Type': 'application/json',
+							'Idempotency-Key': idempotencyKey,
+							'X-Correlation-Id': correlationId,
 						},
 						body: {
 							toAccountId,

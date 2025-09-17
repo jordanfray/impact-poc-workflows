@@ -98,9 +98,33 @@ class BankingTrigger {
         };
     }
     async webhook() {
-        const eventType = this.getNodeParameter('eventType');
-        const minAmount = this.getNodeParameter('minAmount');
-        const accountFilter = this.getNodeParameter('accountFilter');
+        var _a, _b, _c;
+        let eventType = 'transaction-cleared';
+        try {
+            eventType = (_a = this.getNodeParameter('eventType')) !== null && _a !== void 0 ? _a : 'transaction-cleared';
+        }
+        catch {
+            // Fallback to default if parameter not available in context
+            eventType = 'transaction-cleared';
+        }
+        // Only request minAmount when the parameter is visible for the selected eventType
+        let minAmount = 0;
+        const minAmountSupportedEvents = [
+            'transaction-cleared',
+            'transfer-complete',
+            'large-transaction',
+        ];
+        if (minAmountSupportedEvents.includes(eventType)) {
+            minAmount = (_b = this.getNodeParameter('minAmount')) !== null && _b !== void 0 ? _b : 0;
+        }
+        // Provide a safe fallback for optional account filter
+        let accountFilter = '';
+        try {
+            accountFilter = (_c = this.getNodeParameter('accountFilter')) !== null && _c !== void 0 ? _c : '';
+        }
+        catch {
+            accountFilter = '';
+        }
         const body = this.getBodyData();
         const headers = this.getHeaderData();
         const query = this.getQueryData();
