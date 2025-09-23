@@ -1,6 +1,7 @@
 'use client'
 
-import { Heading, Text, Flex, Box, Card, TextField, Button, Separator } from "@radix-ui/themes"
+import { Heading, Text, Flex, Box, Card, TextField, Button, Separator, Table, IconButton } from "@radix-ui/themes"
+import { Key as KeyIcon, Trash } from "@phosphor-icons/react/dist/ssr"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/AuthProvider"
 import { DashboardLayout } from "@/components/DashboardLayout"
@@ -24,6 +25,10 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
+  const [apiKeys, setApiKeys] = useState<any[]>([])
+  const [creatingKey, setCreatingKey] = useState(false)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [newPlainKey, setNewPlainKey] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -34,6 +39,21 @@ export default function ProfilePage() {
       setAvatar(profile.avatar)
     }
   }, [user, profile])
+
+  useEffect(() => {
+    const loadKeys = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch('/api/profile/api-keys', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        if (res.ok) {
+          const json = await res.json()
+          setApiKeys(json.keys || [])
+        }
+      } catch {}
+    }
+    loadKeys()
+  }, [])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -311,6 +331,110 @@ export default function ProfilePage() {
         </Card>
 
         <Separator size="4" />
+
+        {/* API Keys */}
+        <Card style={{ padding: '24px' }}>
+          <Flex direction="column" gap="4">
+            <Flex align="center" gap="3">
+              <KeyIcon size={20} color="var(--gray-12)" />
+              <Heading size="4">API Keys</Heading>
+            </Flex>
+
+            {newPlainKey && (
+              <Box style={{ backgroundColor: 'var(--yellow-2)', border: '1px solid var(--yellow-6)', padding: '12px', borderRadius: 6 }}>
+                <Text size="2">
+                  Copy your new API key now — you won’t be able to see it again:
+                </Text>
+                <Text size="2" weight="bold" style={{ display: 'block', fontFamily: 'monospace', marginTop: 8 }}>{newPlainKey}</Text>
+              </Box>
+            )}
+
+            <Flex gap="2" align="end">
+              <TextField.Root
+                placeholder="Key name (e.g., n8n)"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                onClick={async () => {
+                  try {
+                    setCreatingKey(true)
+                    const { data: { session } } = await supabase.auth.getSession()
+                    if (!session?.access_token) return
+                    const res = await fetch('/api/profile/api-keys', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                      body: JSON.stringify({ name: newKeyName || 'API Key' })
+                    })
+                    if (res.ok) {
+                      const json = await res.json()
+                      setNewPlainKey(json.key.plain)
+                      setNewKeyName('')
+                      // refresh list
+                      const list = await fetch('/api/profile/api-keys', { headers: { Authorization: `Bearer ${session.access_token}` } })
+                      if (list.ok) setApiKeys((await list.json()).keys || [])
+                      showToast({ type: 'success', title: 'API key created', description: 'Copy it now and store it securely.' })
+                    } else {
+                      showToast({ type: 'error', title: 'Create failed', description: (await res.json()).error || 'Could not create key' })
+                    }
+                  } finally { setCreatingKey(false) }
+                }}
+                disabled={creatingKey}
+                style={{ cursor: 'pointer' }}
+              >
+                {creatingKey ? 'Creating...' : 'Create API Key'}
+              </Button>
+            </Flex>
+
+            {apiKeys.length === 0 ? (
+              <Text size="2" color="gray">No API keys yet.</Text>
+            ) : (
+              <Table.Root>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeaderCell>Name</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Key</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Created</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Last Used</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell></Table.ColumnHeaderCell>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {apiKeys.map((k: any) => (
+                    <Table.Row key={k.id}>
+                      <Table.Cell>{k.name}</Table.Cell>
+                      <Table.Cell><code>{k.prefix}••••{k.lastFour}</code></Table.Cell>
+                      <Table.Cell>{new Date(k.createdAt).toLocaleDateString()}</Table.Cell>
+                      <Table.Cell>{k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : '—'}</Table.Cell>
+                      <Table.Cell>
+                        <IconButton
+                          variant="ghost"
+                          color="red"
+                          size="1"
+                          onClick={async () => {
+                            const { data: { session } } = await supabase.auth.getSession()
+                            if (!session?.access_token) return
+                            const res = await fetch(`/api/profile/api-keys?id=${k.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` } })
+                            if (res.ok) {
+                              setApiKeys((prev) => prev.filter((x) => x.id !== k.id))
+                              showToast({ type: 'success', title: 'Key revoked', description: 'The API key was revoked.' })
+                            } else {
+                              showToast({ type: 'error', title: 'Revoke failed', description: (await res.json()).error || 'Could not revoke key' })
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <Trash size={12} />
+                        </IconButton>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            )}
+          </Flex>
+        </Card>
 
         {/* Password Change */}
         <Card style={{ padding: '24px' }}>

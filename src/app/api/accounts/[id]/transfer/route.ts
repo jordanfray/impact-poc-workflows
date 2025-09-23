@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createClient } from '@supabase/supabase-js'
+import { authenticateRequest } from '@/lib/auth'
 import { formatCurrency } from '@/lib/utils'
 
 // POST /api/accounts/[id]/transfer - Transfer funds between accounts
@@ -9,31 +10,21 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
-    }
+    // Authenticate via API key or user token
+    const auth = await authenticateRequest(request.headers)
 
-    // Create a server-side Supabase client with the user's token
-    const token = authHeader.replace('Bearer ', '')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      }
-    )
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // If using API key, fetch a service user context (owner of the key)
+    let userId = auth.userId
+    let userEmail: string | null = null
+    if (!auth.usingApiKey) {
+      const token = request.headers.get('authorization')!.replace('Bearer ', '')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+        { global: { headers: { Authorization: `Bearer ${token}` } } }
+      )
+      const { data: { user } } = await supabase.auth.getUser()
+      userEmail = user?.email || null
     }
 
     // Await params
@@ -56,21 +47,13 @@ export async function POST(
       prisma.account.findFirst({
         where: {
           id: fromAccountId,
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
+          users: auth.usingApiKey ? undefined : { some: { userId } }
         }
       }),
       prisma.account.findFirst({
         where: {
           id: toAccountId,
-          users: {
-            some: {
-              userId: user.id
-            }
-          }
+          users: auth.usingApiKey ? undefined : { some: { userId } }
         }
       })
     ])
@@ -145,7 +128,7 @@ export async function POST(
       }
     })
 
-    console.log(`✅ TRANSFER completed: ${formatCurrency(amount)} from ${fromAccount.nickname} to ${toAccount.nickname} for user ${user.email}`)
+    console.log(`✅ TRANSFER completed: ${formatCurrency(amount)} from ${fromAccount.nickname} to ${toAccount.nickname} (${auth.usingApiKey ? 'via API key' : `for user ${userEmail}`})`)
 
     return NextResponse.json({ 
       ...result,

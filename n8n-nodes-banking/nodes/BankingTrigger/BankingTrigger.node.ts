@@ -102,9 +102,32 @@ export class BankingTrigger implements INodeType {
 	};
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
-		const eventType = this.getNodeParameter('eventType') as string;
-		const minAmount = this.getNodeParameter('minAmount') as number;
-		const accountFilter = this.getNodeParameter('accountFilter') as string;
+		let eventType = 'transaction-cleared' as string;
+		try {
+			eventType = (this.getNodeParameter('eventType') as string) ?? 'transaction-cleared';
+		} catch {
+			// Fallback to default if parameter not available in context
+			eventType = 'transaction-cleared';
+		}
+
+		// Only request minAmount when the parameter is visible for the selected eventType
+		let minAmount = 0 as number;
+		const minAmountSupportedEvents = [
+			'transaction-cleared',
+			'transfer-complete',
+			'large-transaction',
+		];
+		if (minAmountSupportedEvents.includes(eventType)) {
+			minAmount = (this.getNodeParameter('minAmount') as number) ?? 0;
+		}
+
+		// Provide a safe fallback for optional account filter
+		let accountFilter = '' as string;
+		try {
+			accountFilter = (this.getNodeParameter('accountFilter') as string) ?? '';
+		} catch {
+			accountFilter = '';
+		}
 
 		const body = this.getBodyData();
 		const headers = this.getHeaderData();

@@ -25,6 +25,24 @@ enum TransactionType {
   TRANSFER
   CHECK_PAYMENT
   CARD_PAYMENT
+  DONATION
+  ACH_PAYMENT
+}
+
+enum PublishStatus {
+  UNLISTED
+  PUBLIC
+}
+
+// Grouping metadata for related transactions (e.g., donation + match transfers)
+enum TransactionGroupPurpose {
+  DONATION_MATCH
+}
+
+enum TransactionGroupRole {
+  DONATION
+  MATCH_DEBIT   // debit from matching account
+  MATCH_CREDIT  // credit to fundraising account
 }
 
 enum CheckStatus {
@@ -44,6 +62,7 @@ model User {
 
   // Banking relationships
   accounts  AccountUser[]
+  apiKeys   ApiKey[]
 
   @@map("users")
 }
@@ -60,6 +79,8 @@ model Account {
   users        AccountUser[]
   transactions Transaction[]
   cards        Card[]
+  fundraising   FundraisingSettings?
+  fundraisingWidgets FundraisingWidget[]
   
   // Transfer relationships
   transfersFrom Transaction[] @relation("TransferFrom")
@@ -89,9 +110,15 @@ model Transaction {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
+  // Optional grouping/correlation for multi-transaction events
+  groupId     String?
+  groupRole   TransactionGroupRole?
+  correlationId String?
+
   // Optional relationships
   cardId  String?
   checkId String?
+  payeeId String?
   
   // Transfer relationships
   transferFromAccountId String? // For TRANSFER type: source account
@@ -101,10 +128,25 @@ model Transaction {
   account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   card              Card?    @relation(fields: [cardId], references: [id])
   check             Check?   @relation(fields: [checkId], references: [id])
+  payee             Payee?   @relation(fields: [payeeId], references: [id])
   transferFromAccount Account? @relation("TransferFrom", fields: [transferFromAccountId], references: [id])
   transferToAccount   Account? @relation("TransferTo", fields: [transferToAccountId], references: [id])
 
+  // Group relation
+  group            TransactionGroup? @relation(fields: [groupId], references: [id])
+
   @@map("transactions")
+}
+
+model TransactionGroup {
+  id        String                    @id @default(cuid())
+  purpose   TransactionGroupPurpose
+  createdAt DateTime                  @default(now())
+
+  // Relations
+  transactions Transaction[]
+
+  @@map("transaction_groups")
 }
 
 model Card {
@@ -115,6 +157,9 @@ model Card {
   expiryMonth   Int
   expiryYear    Int
   isActive      Boolean  @default(true)
+  dailyLimit    Decimal? @db.Decimal(12, 2)
+  monthlyLimit  Decimal? @db.Decimal(12, 2)
+  allowedCategories String[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -125,24 +170,62 @@ model Card {
   @@map("cards")
 }
 
-model Recipient {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  address   String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model FundraisingSettings {
+  id               String         @id @default(cuid())
+  accountId        String         @unique
+  enabled          Boolean        @default(false)
+  title            String?
+  description      String?
+  imageUrl         String?
+  goal             Decimal?       @db.Decimal(12, 2)
+  publishStatus    PublishStatus  @default(UNLISTED)
+  thankYouMessage  String?        @default("Thank you for your donation to our campaign! Your support makes a difference.")
+  matchingEnabled  Boolean        @default(false)
+  matchingPercent  Int?           // 0-100
+  matchingFromAccountId String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  // Relations
-  checks Check[]
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  @@map("recipients")
+  @@map("fundraising_settings")
+}
+
+model FundraisingWidget {
+  id         String   @id @default(cuid())
+  accountId  String
+  name       String
+  embedId    String   @unique
+  config     Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("fundraising_widgets")
+}
+
+model ApiKey {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  prefix       String   // for display (e.g., impk)
+  lastFour     String   // for display
+  hashedKey    String   @unique
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
 }
 
 model Check {
   id          String      @id @default(cuid())
-  recipientId String
+  payeeId     String
   amount      Decimal     @db.Decimal(12, 2)
   memo        String?
   status      CheckStatus @default(PENDING)
@@ -150,8 +233,34 @@ model Check {
   updatedAt   DateTime    @updatedAt
 
   // Relations
-  recipient    Recipient     @relation(fields: [recipientId], references: [id])
+  payee        Payee         @relation(fields: [payeeId], references: [id])
   transactions Transaction[]
 
   @@map("checks")
+}
+
+// Payee for ACH or check payments (bill pay)
+model Payee {
+  id             String   @id @default(cuid())
+  userId         String   // Owner user
+  name           String
+  email          String?
+  phone          String?
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String?  @default("US")
+  achAccountNumber String?
+  achRoutingNumber String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  transactions   Transaction[]
+  checks         Check[]
+
+  @@index([userId])
+  @@map("payees")
 }
