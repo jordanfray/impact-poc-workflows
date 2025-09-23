@@ -12,14 +12,15 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   
   const isAuthPage = pathname === '/auth'
-  const showSidebar = !isAuthPage && user
+  const isFundraisingPublic = pathname?.startsWith('/fundraising/')
+  const showSidebar = !isAuthPage && !isFundraisingPublic && user
 
   // Handle redirects in one place to avoid conflicts
   useEffect(() => {
-    if (loading) return // Wait for auth state to be determined
+    if (loading && !isFundraisingPublic) return // Wait for auth state unless public page
 
-    // Redirect logic
-    if (!user && !isAuthPage) {
+    // Redirect logic (skip for public fundraising pages)
+    if (!user && !isAuthPage && !isFundraisingPublic) {
       router.replace('/auth')
       return
     }
@@ -28,10 +29,10 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
       router.replace('/')
       return
     }
-  }, [user, loading, isAuthPage, router])
+  }, [user, loading, isAuthPage, isFundraisingPublic, router])
 
   // Show loading spinner while checking authentication
-  if (loading) {
+  if (loading && !isFundraisingPublic) {
     return (
       <Box style={{ 
         minHeight: '100vh', 
@@ -69,7 +70,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Authenticated pages - show with sidebar
+  // Authenticated pages - show with sidebar (except public fundraising)
   if (showSidebar) {
     return (
       <Flex>
@@ -86,6 +87,15 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
           {children}
         </Box>
       </Flex>
+    )
+  }
+
+  // Public fundraising page - full width, no sidebar
+  if (isFundraisingPublic) {
+    return (
+      <Box style={{ minHeight: '100vh', backgroundColor: 'var(--color-background)' }}>
+        {children}
+      </Box>
     )
   }
 

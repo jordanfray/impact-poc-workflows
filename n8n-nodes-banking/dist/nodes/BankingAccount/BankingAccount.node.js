@@ -109,7 +109,16 @@ class BankingAccount {
         const items = this.getInputData();
         const returnData = [];
         const operation = this.getNodeParameter('operation', 0);
+        // Generate or reuse a correlation id for this workflow run
+        const globalData = this.getWorkflowStaticData('global');
+        let correlationId = (globalData && globalData.correlationId);
+        if (!correlationId) {
+            correlationId = `${this.getNode().id}:${Date.now()}`;
+            if (globalData)
+                globalData.correlationId = correlationId;
+        }
         for (let i = 0; i < items.length; i++) {
+            const idempotencyKey = `${correlationId}:${i}:${operation}`;
             try {
                 // Get credentials
                 const credentials = await this.getCredentials('bankingApi');
@@ -125,6 +134,8 @@ class BankingAccount {
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
                                 'Content-Type': 'application/json',
+                                'Idempotency-Key': idempotencyKey,
+                                'X-Correlation-Id': correlationId,
                             },
                             body: { nickname },
                             json: true,
@@ -137,6 +148,8 @@ class BankingAccount {
                             url: `${baseUrl}/api/accounts/${accountId}`,
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
+                                'Idempotency-Key': idempotencyKey,
+                                'X-Correlation-Id': correlationId,
                             },
                             json: true,
                         });
@@ -148,6 +161,8 @@ class BankingAccount {
                             url: `${baseUrl}/api/accounts/${balanceAccountId}`,
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
+                                'Idempotency-Key': idempotencyKey,
+                                'X-Correlation-Id': correlationId,
                             },
                             json: true,
                         });
@@ -163,6 +178,8 @@ class BankingAccount {
                             url: `${baseUrl}/api/accounts`,
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
+                                'Idempotency-Key': idempotencyKey,
+                                'X-Correlation-Id': correlationId,
                             },
                             json: true,
                         });
@@ -176,6 +193,8 @@ class BankingAccount {
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
                                 'Content-Type': 'application/json',
+                                'Idempotency-Key': idempotencyKey,
+                                'X-Correlation-Id': correlationId,
                             },
                             body: {
                                 amount: depositAmount,

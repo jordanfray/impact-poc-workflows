@@ -38,58 +38,90 @@ export async function GET(
     // Await params
     const { id } = await params
 
-    const account = await prisma.account.findFirst({
-      where: {
-        id,
-        users: {
-          some: {
-            userId: user.id
-          }
-        }
-      },
-      include: {
-        users: true,
-        transactions: {
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 10, // Latest 10 transactions
-          include: {
-            card: true,
-            check: {
-              include: {
-                recipient: true
-              }
-            },
-            transferFromAccount: {
-              select: {
-                id: true,
-                nickname: true,
-                accountNumber: true
-              }
-            },
-            transferToAccount: {
-              select: {
-                id: true,
-                nickname: true,
-                accountNumber: true
-              }
+    let account
+    try {
+      account = await prisma.account.findFirst({
+        where: {
+          id,
+          users: {
+            some: {
+              userId: user.id
             }
           }
         },
-        cards: {
-          where: {
-            isActive: true
-          }
-        },
-        _count: {
-          select: {
-            transactions: true,
-            cards: true
+        include: {
+          users: true,
+          transactions: {
+            orderBy: {
+              createdAt: 'desc'
+            },
+            take: 10, // Latest 10 transactions
+            include: {
+              card: true,
+              check: { include: { payee: true } },
+              payee: true,
+              transferFromAccount: {
+                select: {
+                  id: true,
+                  nickname: true,
+                  accountNumber: true
+                }
+              },
+              transferToAccount: {
+                select: {
+                  id: true,
+                  nickname: true,
+                  accountNumber: true
+                }
+              },
+              group: true
+            }
+          },
+          cards: {
+            where: {
+              isActive: true
+            }
+          },
+          fundraising: true,
+          fundraisingWidgets: true,
+          _count: {
+            select: {
+              transactions: true,
+              cards: true
+            }
           }
         }
-      }
-    })
+      })
+    } catch (e) {
+      console.warn('Falling back to account query without fundraising relations due to error:', e)
+      account = await prisma.account.findFirst({
+        where: {
+          id,
+          users: {
+            some: {
+              userId: user.id
+            }
+          }
+        },
+        include: {
+          users: true,
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            include: {
+              card: true,
+              check: { include: { payee: true } },
+              payee: true,
+              transferFromAccount: { select: { id: true, nickname: true, accountNumber: true } },
+              transferToAccount: { select: { id: true, nickname: true, accountNumber: true } },
+              group: true
+            },
+          },
+          cards: { where: { isActive: true } },
+          _count: { select: { transactions: true, cards: true } },
+        },
+      })
+    }
 
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
@@ -251,15 +283,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
-    // Check if balance is zero (handle Decimal type)
-    const balance = Number(account.balance)
-    if (balance !== 0) {
-      return NextResponse.json({ 
-        error: `Account cannot be deleted. Balance must be zero. Current balance: $${balance.toFixed(2)}` 
-      }, { status: 400 })
-    }
-
-    // Delete the account and all related data in a transaction
+    // Prototype behavior: Allow deletion regardless of balance.
+    // Recursively delete related data first, then the account.
     await prisma.$transaction(async (tx) => {
       // Delete account users (relationships)
       await tx.accountUser.deleteMany({
@@ -275,6 +300,10 @@ export async function DELETE(
       await tx.card.deleteMany({
         where: { accountId: id }
       })
+
+      // Delete fundraising settings and widgets
+      await tx.fundraisingWidget.deleteMany({ where: { accountId: id } })
+      await tx.fundraisingSettings.deleteMany({ where: { accountId: id } })
 
       // Finally delete the account
       await tx.account.delete({

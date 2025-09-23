@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createClient } from '@supabase/supabase-js'
+import { authenticateRequest } from '@/lib/auth'
 import { n8nAutomation } from '@/lib/n8n-integration'
 
 // POST /api/accounts/[id]/transactions - Create a new transaction (deposit)
@@ -14,38 +15,20 @@ export async function POST(
   console.log('📋 Request params:', { id })
   
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization')
-    console.log('🔐 Auth header check:', { hasAuthHeader: !!authHeader, startsWithBearer: authHeader?.startsWith('Bearer ') })
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('❌ Missing or invalid authorization header')
-      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
-    }
-
-    // Create a server-side Supabase client with the user's token
-    const token = authHeader.replace('Bearer ', '')
-    console.log('🔑 Token extracted, creating Supabase client...')
-    
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      }
-    )
-    
-    console.log('👤 Getting user from Supabase...')
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    console.log('👤 User check:', { hasUser: !!user, userId: user?.id, authError: authError?.message })
-    
-    if (authError || !user) {
-      console.error('❌ User authentication failed:', authError)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate via API key or user token
+    const auth = await authenticateRequest(request.headers)
+    let userId = auth.userId
+    let userEmail: string | null = null
+    let supabase: any = null
+    if (!auth.usingApiKey) {
+      const token = request.headers.get('authorization')!.replace('Bearer ', '')
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+        { global: { headers: { Authorization: `Bearer ${token}` } } }
+      )
+      const { data: { user } } = await supabase.auth.getUser()
+      userEmail = user?.email || null
     }
 
     // Parse request body
@@ -67,16 +50,9 @@ export async function POST(
     }
 
     // Verify user has access to this account
-    console.log('🏦 Checking account access...', { accountId: id, userId: user.id })
+    console.log('🏦 Checking account access...', { accountId: id, userId })
     const account = await prisma.account.findFirst({
-      where: {
-        id: id,
-        users: {
-          some: {
-            userId: user.id
-          }
-        }
-      }
+      where: auth.usingApiKey ? { id } : { id, users: { some: { userId } } }
     })
     console.log('🏦 Account check result:', { hasAccount: !!account, accountId: account?.id, nickname: account?.nickname })
 
@@ -117,7 +93,7 @@ export async function POST(
       return { transaction, account: updatedAccount }
     })
 
-    console.log(`✅ ${type} transaction created: $${amount} for account ${account.nickname} (${user.email})`)
+    console.log(`✅ ${type} transaction created: $${amount} for account ${account.nickname} (${auth.usingApiKey ? 'via API key' : `for user ${userEmail}`})`)
 
     // Trigger n8n automation workflows
     try {
@@ -165,7 +141,7 @@ export async function POST(
 // GET /api/accounts/[id]/transactions - Get account transactions
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get auth header
@@ -195,6 +171,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Await params
+    const { id } = await params
+
     // Verify user has access to this account
     const account = await prisma.account.findFirst({
       where: {
@@ -216,22 +195,22 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    // Optional type filter (comma-separated list)
+    const typeInParam = searchParams.get('typeIn')
+    const typeIn = typeInParam ? typeInParam.split(',').map(t => t.trim()).filter(Boolean) as any[] : undefined
+
     // Get transactions for this account
     const transactions = await prisma.transaction.findMany({
       where: {
-        accountId: id
+        accountId: id,
+        ...(typeIn ? { type: { in: typeIn as any } } : {})
       },
       include: {
         card: true,
-        check: {
-          include: {
-            recipient: true
-          }
-        }
+        check: { include: { payee: true } },
+        payee: true
       },
-      orderBy: {
-        createdAt: 'desc'
-      },
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset
     })

@@ -53,6 +53,14 @@ export default function RootLayout({
             }
           }
 
+          /* Remove border from last table row in any .no-last-row-border table */
+          .no-last-row-border table tr:last-child td,
+          .no-last-row-border table tr:last-child th,
+          .no-last-row-border tr:last-child td,
+          .no-last-row-border tr:last-child th {
+            border-bottom: none !important;
+          }
+
           /* Let Radix UI handle body background and text colors */
         `}</style>
       </head>

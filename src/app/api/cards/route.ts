@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     console.log('💳 Cards fetched:', { count: cards.length })
 
     return NextResponse.json({
-      cards: cards.map(card => ({
+      cards: cards.map((card: any) => ({
         id: card.id,
         accountId: card.accountId,
         cardNumber: card.cardNumber,
@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
         expiryMonth: card.expiryMonth,
         expiryYear: card.expiryYear,
         isActive: card.isActive,
+        dailyLimit: (card as any).dailyLimit ?? null,
+        monthlyLimit: (card as any).monthlyLimit ?? null,
+        allowedCategories: (card as any).allowedCategories ?? [],
         createdAt: card.createdAt,
         updatedAt: card.updatedAt,
         account: card.account,
@@ -139,7 +142,7 @@ export async function POST(request: NextRequest) {
     // Parse request body
     console.log('📦 Parsing request body...')
     const body = await request.json()
-    const { accountId, cardholderName } = body
+    const { accountId, cardholderName, dailyLimit, monthlyLimit, allowedCategories } = body
 
     console.log('📦 Request body:', { accountId, cardholderName })
 
@@ -192,13 +195,16 @@ export async function POST(request: NextRequest) {
     // Create the card
     console.log('💳 Creating card...')
     const card = await prisma.card.create({
-      data: {
+      data: ({
         accountId,
         cardNumber,
         cardholderName,
         expiryMonth,
-        expiryYear
-      },
+        expiryYear,
+        dailyLimit: dailyLimit !== undefined && dailyLimit !== null ? Number(dailyLimit) : null,
+        monthlyLimit: monthlyLimit !== undefined && monthlyLimit !== null ? Number(monthlyLimit) : null,
+        allowedCategories: Array.isArray(allowedCategories) ? allowedCategories : []
+      }) as any,
       include: {
         account: {
           select: {
@@ -221,7 +227,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      card: {
+      card: ({
         id: card.id,
         accountId: card.accountId,
         cardNumber: card.cardNumber,
@@ -229,14 +235,18 @@ export async function POST(request: NextRequest) {
         expiryMonth: card.expiryMonth,
         expiryYear: card.expiryYear,
         isActive: card.isActive,
+        dailyLimit: (card as any).dailyLimit ?? null,
+        monthlyLimit: (card as any).monthlyLimit ?? null,
+        allowedCategories: (card as any).allowedCategories ?? [],
         createdAt: card.createdAt,
         updatedAt: card.updatedAt,
-        account: card.account
-      }
+        account: (card as any).account
+      })
     }, { status: 201 })
 
   } catch (error) {
     console.error('❌ Error creating card:', error)
-    return NextResponse.json({ error: 'Failed to create card' }, { status: 500 })
+    const message = (error as any)?.message || 'Failed to create card'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -153,7 +153,7 @@ export async function PUT(
     // Parse request body
     console.log('📦 Parsing request body...')
     const body = await request.json()
-    const { cardholderName, isActive } = body
+    const { cardholderName, isActive, dailyLimit, monthlyLimit, allowedCategories } = body
 
     console.log('📦 Request body:', { cardholderName, isActive })
 
@@ -182,6 +182,9 @@ export async function PUT(
     const updateData: any = {}
     if (cardholderName !== undefined) updateData.cardholderName = cardholderName
     if (isActive !== undefined) updateData.isActive = isActive
+    if (dailyLimit !== undefined) updateData.dailyLimit = dailyLimit === null ? null : Number(dailyLimit)
+    if (monthlyLimit !== undefined) updateData.monthlyLimit = monthlyLimit === null ? null : Number(monthlyLimit)
+    if (allowedCategories !== undefined) updateData.allowedCategories = Array.isArray(allowedCategories) ? allowedCategories : []
 
     const card = await prisma.card.update({
       where: {
@@ -210,6 +213,9 @@ export async function PUT(
         expiryMonth: card.expiryMonth,
         expiryYear: card.expiryYear,
         isActive: card.isActive,
+        dailyLimit: card.dailyLimit,
+        monthlyLimit: card.monthlyLimit,
+        allowedCategories: card.allowedCategories,
         createdAt: card.createdAt,
         updatedAt: card.updatedAt,
         account: card.account

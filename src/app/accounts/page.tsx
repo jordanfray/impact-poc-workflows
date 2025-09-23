@@ -142,107 +142,101 @@ export default function AccountsPage() {
           <Text>Loading accounts...</Text>
         ) : (
           <>
-        {/* Accounts Table */}
-        <Card>
-          <Table.Root>
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeaderCell>Account</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell align="right">Balance</Table.ColumnHeaderCell>
-                <Table.ColumnHeaderCell width="48px"></Table.ColumnHeaderCell>
-              </Table.Row>
-            </Table.Header>
-
-            <Table.Body>
-              {accounts.map((account) => (
-                <Table.Row key={account.id} style={{ cursor: 'pointer' }} onClick={() => router.push(`/accounts/${account.id}`)}>
-                  <Table.Cell>
-                    <Flex align="center" gap="3">
-                      <Box style={{ 
-                        backgroundColor: 'var(--accent-3)',
-                        borderRadius: 8,
-                        padding: 12,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <CreditCard size={20} color="var(--accent-11)" />
-                      </Box>
-                      <Box>
-                        <Text size="3" weight="medium" style={{ 
-                          fontFamily: 'F37Jan',
-                          color: 'var(--gray-12)'
-                        }}>
-                          {account.nickname}
-                        </Text>
-                        <Text size="2" color="gray" style={{ 
-                          fontFamily: 'monospace',
-                          letterSpacing: '0.5px'
-                        }}>
-                          ••••{account.accountNumber.slice(-4)}
-                        </Text>
-                      </Box>
-                    </Flex>
-                  </Table.Cell>
-
-                  <Table.Cell align="right">
-                    <Text size="4" weight="medium" style={{ 
-                      fontFamily: 'F37Jan',
-                      color: 'var(--gray-12)'
-                    }}>
-                      {formatCurrency(account.balance)}
-                    </Text>
-                  </Table.Cell>
-
-                  <Table.Cell>
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger>
-                        <IconButton
-                          size="2"
-                          variant="ghost"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <DotsThree size={16} />
-                        </IconButton>
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Content>
-                        <DropdownMenu.Item onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/accounts/${account.id}`)
-                        }}>
-                          <Flex align="center" gap="2">
-                            <Eye size={14} />
-                            View Details
-                          </Flex>
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item onClick={(e) => {
-                          e.stopPropagation()
-                          // TODO: Implement quick deposit
-                          console.log('Quick deposit for account:', account.id)
-                        }}>
-                          <Flex align="center" gap="2">
-                            <ArrowUp size={14} />
-                            Deposit
-                          </Flex>
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item onClick={(e) => {
-                          e.stopPropagation()
-                          setTransferFromAccountId(account.id)
-                          setShowTransferModal(true)
-                        }}>
-                          <Flex align="center" gap="2">
-                            <ArrowRight size={14} />
-                            Transfer
-                          </Flex>
-                        </DropdownMenu.Item>
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Root>
-                  </Table.Cell>
+        {/* Accounts Table (shown only when accounts exist) */}
+        {accounts.length > 0 && (
+          <Card>
+            <Table.Root>
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeaderCell>Account</Table.ColumnHeaderCell>
+                  <Table.ColumnHeaderCell>Account Number</Table.ColumnHeaderCell>
+                  <Table.ColumnHeaderCell align="right">Balance</Table.ColumnHeaderCell>
+                  <Table.ColumnHeaderCell width="48px"></Table.ColumnHeaderCell>
                 </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card>
+              </Table.Header>
+
+              <Table.Body>
+                {accounts.map((account) => (
+                  <Table.Row key={account.id} style={{ cursor: 'pointer' }} onClick={() => router.push(`/accounts/${account.id}`)}>
+                    <Table.Cell>
+                      <Flex align="center" gap="3">
+                        <Box>
+                          <Text size="3" weight="regular" style={{ 
+                            fontFamily: 'F37Jan',
+                            color: 'var(--gray-12)'
+                          }}>
+                            {account.nickname}
+                          </Text>
+                        </Box>
+                      </Flex>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text size="3" weight="regular" style={{ 
+                        fontFamily: 'F37Jan',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {account.accountNumber}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell align="right">
+                      <Text size="3" weight="regular" style={{ 
+                        fontFamily: 'F37Jan',
+                        color: 'var(--gray-12)'
+                      }}>
+                        {formatCurrency(account.balance)}
+                      </Text>
+                    </Table.Cell>
+
+                    <Table.Cell>
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger>
+                          <IconButton
+                            size="2"
+                            variant="ghost"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DotsThree size={16} />
+                          </IconButton>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Content>
+                          <DropdownMenu.Item onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/accounts/${account.id}`)
+                          }}>
+                            <Flex align="center" gap="2">
+                              <Eye size={14} />
+                              View Details
+                            </Flex>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item onClick={(e) => {
+                            e.stopPropagation()
+                            // TODO: Implement quick deposit
+                            console.log('Quick deposit for account:', account.id)
+                          }}>
+                            <Flex align="center" gap="2">
+                              <ArrowUp size={14} />
+                              Deposit
+                            </Flex>
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item onClick={(e) => {
+                            e.stopPropagation()
+                            setTransferFromAccountId(account.id)
+                            setShowTransferModal(true)
+                          }}>
+                            <Flex align="center" gap="2">
+                              <ArrowRight size={14} />
+                              Transfer
+                            </Flex>
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Root>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Card>
+        )}
 
         {/* Empty State (when no accounts) */}
         {accounts.length === 0 && (
