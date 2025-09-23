@@ -58,6 +58,12 @@ export class BankingNotification implements INodeType {
 						description: 'Send low balance notification',
 						action: 'Send low balance alert',
 					},
+					{
+						name: 'Custom Notification',
+						value: 'custom',
+						description: 'Send a custom notification (title and description)',
+						action: 'Send custom notification',
+					},
 				],
 				default: 'transactionAlert',
 			},
@@ -112,6 +118,11 @@ export class BankingNotification implements INodeType {
 					},
 				],
 				default: 'standard',
+				displayOptions: {
+					show: {
+						operation: ['transactionAlert','fraudAlert','accountWelcome','lowBalance']
+					}
+				},
 			},
 			{
 				displayName: 'Custom Message',
@@ -122,12 +133,34 @@ export class BankingNotification implements INodeType {
 				},
 				displayOptions: {
 					show: {
+						operation: ['transactionAlert','fraudAlert','accountWelcome','lowBalance'],
 						template: ['custom'],
 					},
 				},
 				default: '',
 				placeholder: 'Your custom notification message...',
 				description: 'Custom notification message',
+			},
+			{
+				displayName: 'Title',
+				name: 'customTitle',
+				type: 'string',
+				default: '',
+				placeholder: 'Notification title',
+				displayOptions: {
+					show: { operation: ['custom'] }
+				},
+			},
+			{
+				displayName: 'Description',
+				name: 'customDescription',
+				type: 'string',
+				typeOptions: { rows: 4 },
+				default: '',
+				placeholder: 'Notification description',
+				displayOptions: {
+					show: { operation: ['custom'] }
+				},
 			},
 		],
 	};
@@ -137,26 +170,27 @@ export class BankingNotification implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 		const operation = this.getNodeParameter('operation', 0);
 
-		for (let i = 0; i < items.length; i++) {
-			try {
-				const email = this.getNodeParameter('email', i) as string;
-				const accountId = this.getNodeParameter('accountId', i) as string;
-				const template = this.getNodeParameter('template', i) as string;
+        for (let i = 0; i < items.length; i++) {
+            try {
 
-				// Get credentials
-				const credentials = await this.getCredentials('bankingApi');
-				const baseUrl = credentials.baseUrl as string;
+                // Get credentials
+                const credentials = await this.getCredentials('bankingApi');
+                const baseUrl = credentials.baseUrl as string;
+                const apiKey = credentials.apiKey as string;
 
 				let notificationData: any = {
-					email,
-					accountId,
-					operation,
-					template,
+                    operation,
 					timestamp: new Date().toISOString(),
 				};
 
-				switch (operation) {
+                switch (operation) {
 					case 'transactionAlert':
+                        {
+                            const email = this.getNodeParameter('email', i, '') as string;
+                            const accountId = this.getNodeParameter('accountId', i, '') as string;
+                            const template = this.getNodeParameter('template', i, 'standard') as string;
+                            notificationData = { ...notificationData, email, accountId, template };
+                        }
 						const amount = this.getNodeParameter('amount', i) as number;
 						notificationData = {
 							...notificationData,
@@ -167,6 +201,12 @@ export class BankingNotification implements INodeType {
 						break;
 
 					case 'fraudAlert':
+                        {
+                            const email = this.getNodeParameter('email', i, '') as string;
+                            const accountId = this.getNodeParameter('accountId', i, '') as string;
+                            const template = this.getNodeParameter('template', i, 'standard') as string;
+                            notificationData = { ...notificationData, email, accountId, template };
+                        }
 						const fraudAmount = this.getNodeParameter('amount', i) as number;
 						notificationData = {
 							...notificationData,
@@ -177,15 +217,29 @@ export class BankingNotification implements INodeType {
 						};
 						break;
 
-					case 'accountWelcome':
-						notificationData = {
-							...notificationData,
-							subject: `Welcome to Your New Banking Account`,
-							message: `Your new banking account has been created successfully. Account ID: ${accountId}`,
-						};
-						break;
+                    case 'accountWelcome':
+                        {
+                            const email = this.getNodeParameter('email', i, '') as string;
+                            const accId = this.getNodeParameter('accountId', i, '') as string;
+                            const template = this.getNodeParameter('template', i, 'standard') as string;
+                            notificationData = {
+                                ...notificationData,
+                                email,
+                                accountId: accId,
+                                template,
+                                subject: `Welcome to Your New Banking Account`,
+                                message: `Your new banking account has been created successfully. Account ID: ${accId}`,
+                            };
+                        }
+                        break;
 
 					case 'lowBalance':
+                        {
+                            const email = this.getNodeParameter('email', i, '') as string;
+                            const accountId = this.getNodeParameter('accountId', i, '') as string;
+                            const template = this.getNodeParameter('template', i, 'standard') as string;
+                            notificationData = { ...notificationData, email, accountId, template };
+                        }
 						notificationData = {
 							...notificationData,
 							subject: `Low Balance Alert`,
@@ -194,29 +248,44 @@ export class BankingNotification implements INodeType {
 						};
 						break;
 
+                    case 'custom':
+                        const customTitle = this.getNodeParameter('customTitle', i) as string;
+                        const customDesc = this.getNodeParameter('customDescription', i) as string;
+                        notificationData = {
+                            title: customTitle,
+                            message: customDesc,
+                        } as any;
+                        break;
+
 					default:
 						throw new NodeOperationError(this.getNode(), `Unknown operation: ${operation}`);
 				}
 
-				// If custom template, use custom message
-				if (template === 'custom') {
-					const customMessage = this.getNodeParameter('customMessage', i) as string;
-					notificationData.message = customMessage;
-				}
+                // For legacy template option on non-custom operations, allow overriding message when provided
+                if (operation !== 'custom') {
+                    const customMessage = this.getNodeParameter('customMessage', i, '') as string;
+                    if (customMessage) notificationData.message = customMessage;
+                }
 
-				// In a real implementation, you would send the notification here
-				// For now, we'll just return the notification data
-				returnData.push({
-					json: {
-						success: true,
-						notification: notificationData,
-						sent: true,
-						provider: 'banking-notification-system',
-					},
-					pairedItem: {
-						item: i,
-					},
-				});
+                // Send to Impact notifications API
+                const created = await this.helpers.request({
+                    method: 'POST',
+                    url: `${baseUrl}/api/notifications`,
+                    headers: {
+                        'X-API-Key': apiKey,
+                        'Content-Type': 'application/json',
+                    },
+                    body: {
+                        title: (notificationData.title || notificationData.subject || 'Notification') as string,
+                        description: (notificationData.message || notificationData.description || 'Notification received') as string,
+                    },
+                    json: true,
+                });
+
+                returnData.push({
+                    json: { success: true, created },
+                    pairedItem: { item: i },
+                });
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnData.push({

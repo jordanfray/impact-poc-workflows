@@ -234,3 +234,80 @@ This project is part of the Gloo Impact ecosystem and follows internal licensing
 **Built with ❤️ by the Gloo Impact Team**
 
 *Ready to build the next great feature? Start coding! 🚀*
+
+## n8n Integration: Triggers and Actions
+
+### Triggers (Impact → n8n webhooks)
+
+- Account Created (POST /webhook/account-created)
+  - accountId, accountNumber, accountNickname, balance
+  - createdAt, updatedAt
+  - eventType: 'account-created', timestamp
+  - user: { id, email, firstName, lastName, fullName, phone }
+
+- Transaction Cleared (POST /webhook/transaction-cleared)
+  - transactionId, accountId, accountNumber, accountNickname, accountBalance
+  - amount, type, status, createdAt, updatedAt
+  - cardId, checkId, transferFromAccountId, transferToAccountId
+  - eventType: 'transaction-cleared', timestamp
+  - metadata: { trigger: 'transaction_processed' }
+  - user: { id, email, firstName, lastName, fullName, phone }
+
+- Large Transaction (POST /webhook/large-transaction)
+  - transactionId, accountId, accountNumber, accountNickname
+  - amount, type, status
+  - eventType: 'large-transaction', timestamp
+  - metadata: { trigger: 'large_amount', threshold: 10000 }
+  - user: { id, email, firstName, lastName, fullName, phone }
+
+- Transfer Complete (POST /webhook/transfer-complete)
+  - transactionId, accountId, accountNumber, accountNickname, accountBalance
+  - amount, type, status, transferFromAccountId, transferToAccountId
+  - eventType: 'transfer-complete', timestamp
+  - metadata: { trigger: 'transfer_completed' }
+  - user: { id, email, firstName, lastName, fullName, phone }
+
+- Low Balance (POST /webhook/low-balance)
+  - accountId, accountBalance, threshold
+  - eventType: 'low-balance', timestamp
+  - metadata: { trigger: 'balance_below_threshold' }
+  - user: { id, email, firstName, lastName, fullName, phone }
+
+- Card Created (POST /webhook/card-created)
+  - accountId, cardId
+  - eventType: 'card-created', timestamp
+  - metadata: { event: 'card_issued', cardId }
+  - user: { id, email, firstName, lastName, fullName, phone }
+
+Notes
+- Use test endpoints by setting `N8N_TEST_MODE=true`, which switches to `/webhook-test/...` paths.
+- Non-JSON responses from n8n are handled (falls back to text).
+
+### Actions (n8n → Impact nodes)
+
+- Banking Account (create/list)
+  - Auth: Impact API Key (header `X-API-Key`)
+  - Create: POST /api/accounts
+    - body: { nickname? }
+    - headers include: Idempotency-Key, X-Correlation-Id (auto from node)
+  - List: GET /api/accounts
+
+- Banking Transfer (transfer)
+  - Auth: Impact API Key (header `X-API-Key`)
+  - POST /api/accounts/{fromAccountId}/transfer
+    - body: { toAccountId, amount, description? }
+    - headers include: Idempotency-Key, X-Correlation-Id
+
+- Banking Notification (send)
+  - Auth: Impact API Key (header `X-API-Key`)
+  - POST /api/notifications
+    - body (varies by operation):
+      - transactionAlert/fraudAlert/accountWelcome/lowBalance: title/description derived
+      - customNotification: { title, description }
+
+Credential: Impact API Key
+- Fields: baseUrl, apiKey
+- Sends header `X-API-Key: <apiKey>` for all requests
+
+Tip
+- In n8n Editor, ensure workflows are Active for `/webhook/...` endpoints and set Execution → Save Data on Success to view runs.

@@ -132,7 +132,7 @@ class BankingTransfer {
                         method: 'POST',
                         url: `${baseUrl}/api/accounts/${fromAccountId}/transfer`,
                         headers: {
-                            'Authorization': `Bearer ${apiKey}`,
+                            'X-API-Key': apiKey,
                             'Content-Type': 'application/json',
                             'Idempotency-Key': idempotencyKey,
                             'X-Correlation-Id': correlationId,

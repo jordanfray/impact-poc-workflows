@@ -4,11 +4,38 @@
  * This module provides integration with n8n workflows for banking automation tasks
  */
 
+interface N8nUserContext {
+  id: string
+  email?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  fullName?: string | null
+  phone?: string | null
+}
+
 interface N8nWebhookPayload {
-  accountId: string
-  amount: number
-  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER'
+  accountId?: string
+  amount?: number
+  type?: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER'
   metadata?: Record<string, any>
+  // Event context
+  transactionId?: string
+  accountNumber?: string
+  accountNickname?: string
+  accountBalance?: any
+  threshold?: number
+  balance?: any
+  status?: string
+  transferFromAccountId?: string | null
+  transferToAccountId?: string | null
+  cardId?: string
+  checkId?: string
+  createdAt?: string | Date
+  updatedAt?: string | Date
+  eventType?: string
+  timestamp?: string
+  // User context for personalization
+  user?: N8nUserContext
 }
 
 interface N8nWorkflowTrigger {
@@ -87,7 +114,12 @@ export class N8nBankingAutomation {
         throw new Error(`n8n webhook failed: ${response.status}`)
       }
 
-      return await response.json()
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        return await response.json()
+      }
+      // Fallback for Webhook nodes that return plain text (e.g., "firstEntryJson")
+      return await response.text()
     } catch (error) {
       console.error('Failed to trigger n8n workflow:', error)
       throw error
@@ -97,7 +129,7 @@ export class N8nBankingAutomation {
   /**
    * Banking-specific workflow triggers
    */
-  async onTransactionCreated(transaction: any, account: any) {
+  async onTransactionCreated(transaction: any, account: any, user?: N8nUserContext) {
     console.log(`🤖 n8n automation trigger - Transaction Created (Test Mode: ${this.testMode})`)
 
     // Trigger Transaction Cleared event
@@ -120,7 +152,8 @@ export class N8nBankingAutomation {
         transferToAccountId: transaction.transferToAccountId,
         eventType: 'transaction-cleared',
         timestamp: new Date().toISOString(),
-        metadata: { trigger: 'transaction_processed' }
+        metadata: { trigger: 'transaction_processed' },
+        user
       }
     )
 
@@ -138,7 +171,8 @@ export class N8nBankingAutomation {
           status: transaction.status,
           eventType: 'large-transaction',
           timestamp: new Date().toISOString(),
-          metadata: { trigger: 'large_amount', threshold: 10000 }
+          metadata: { trigger: 'large_amount', threshold: 10000 },
+          user
         }
       )
     }
@@ -160,31 +194,33 @@ export class N8nBankingAutomation {
           transferToAccountId: transaction.transferToAccountId,
           eventType: 'transfer-complete',
           timestamp: new Date().toISOString(),
-          metadata: { trigger: 'transfer_completed' }
+          metadata: { trigger: 'transfer_completed' },
+          user
         }
       )
     }
   }
 
-  async onAccountCreated(account: any) {
+  async onAccountCreated(account: any, user?: N8nUserContext) {
     console.log(`🤖 n8n automation trigger - Account Created (Test Mode: ${this.testMode})`)
     await this.triggerWorkflow(
       this.getWebhookUrl('account-created'),
       {
         accountId: account.id,
         accountNumber: account.accountNumber,
-        nickname: account.nickname,
+        accountNickname: account.nickname,
         balance: account.balance,
         createdAt: account.createdAt,
         updatedAt: account.updatedAt,
         eventType: 'account-created',
         timestamp: new Date().toISOString(),
-        metadata: { event: 'account_created' }
+        metadata: { event: 'account_created' },
+        user
       }
     )
   }
 
-  async onCardIssued(accountId: string, cardId: string) {
+  async onCardIssued(accountId: string, cardId: string, user?: N8nUserContext) {
     console.log(`🤖 n8n automation trigger - Card Issued (Test Mode: ${this.testMode})`)
     await this.triggerWorkflow(
       this.getWebhookUrl('card-created'),
@@ -193,22 +229,24 @@ export class N8nBankingAutomation {
         cardId,
         eventType: 'card-created',
         timestamp: new Date().toISOString(),
-        metadata: { event: 'card_issued', cardId }
+        metadata: { event: 'card_issued', cardId },
+        user
       }
     )
   }
 
-  async onLowBalance(accountId: string, currentBalance: number, threshold: number = 100) {
+  async onLowBalance(accountId: string, currentBalance: number, threshold: number = 100, user?: N8nUserContext) {
     console.log(`🤖 n8n automation trigger - Low Balance (Test Mode: ${this.testMode})`)
     await this.triggerWorkflow(
       this.getWebhookUrl('low-balance'),
       { 
         accountId, 
-        currentBalance,
+        accountBalance: currentBalance,
         threshold,
         eventType: 'low-balance',
         timestamp: new Date().toISOString(),
-        metadata: { trigger: 'balance_below_threshold' }
+        metadata: { trigger: 'balance_below_threshold' },
+        user
       }
     )
   }

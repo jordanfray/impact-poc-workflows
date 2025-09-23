@@ -192,6 +192,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account not found or access denied' }, { status: 404 })
     }
 
+    // Prepare user context for n8n
+    let userContext: any = undefined
+    if (user) {
+      const fullName = (user.user_metadata as any)?.full_name || null
+      const firstName = (user.user_metadata as any)?.first_name || (fullName ? String(fullName).split(' ')[0] : null)
+      const lastName = (user.user_metadata as any)?.last_name || (fullName ? String(fullName).split(' ').slice(1).join(' ') || null : null)
+      const phone = (user.user_metadata as any)?.phone || null
+      userContext = { id: user.id, email: user.email || null, firstName, lastName, fullName, phone }
+    }
+
     // Create the card
     console.log('💳 Creating card...')
     const card = await prisma.card.create({
@@ -220,7 +230,7 @@ export async function POST(request: NextRequest) {
 
     // Trigger n8n automation for card issuance
     try {
-      await n8nAutomation.onCardIssued(accountId, card.id)
+      await n8nAutomation.onCardIssued(accountId, card.id, userContext)
       console.log('🤖 n8n card issuance automation triggered')
     } catch (error) {
       console.warn('⚠️ n8n automation failed (non-blocking):', error)

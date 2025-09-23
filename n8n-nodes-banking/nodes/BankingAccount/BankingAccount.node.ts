@@ -135,11 +135,11 @@ export class BankingAccount implements INodeType {
 				switch (operation) {
 					case 'create':
 						const nickname = this.getNodeParameter('nickname', i) as string;
-						responseData = await this.helpers.request({
+                        responseData = await this.helpers.request({
 							method: 'POST',
 							url: `${baseUrl}/api/accounts`,
 							headers: {
-								'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
 								'Content-Type': 'application/json',
 								'Idempotency-Key': idempotencyKey,
 								'X-Correlation-Id': correlationId,
@@ -151,11 +151,11 @@ export class BankingAccount implements INodeType {
 
 					case 'get':
 						const accountId = this.getNodeParameter('accountId', i) as string;
-						responseData = await this.helpers.request({
+                        responseData = await this.helpers.request({
 							method: 'GET',
 							url: `${baseUrl}/api/accounts/${accountId}`,
 							headers: {
-								'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
 								'Idempotency-Key': idempotencyKey,
 								'X-Correlation-Id': correlationId,
 							},
@@ -165,11 +165,11 @@ export class BankingAccount implements INodeType {
 
 					case 'balance':
 						const balanceAccountId = this.getNodeParameter('accountId', i) as string;
-						const accountData = await this.helpers.request({
+                        const accountData = await this.helpers.request({
 							method: 'GET',
 							url: `${baseUrl}/api/accounts/${balanceAccountId}`,
 							headers: {
-								'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
 								'Idempotency-Key': idempotencyKey,
 								'X-Correlation-Id': correlationId,
 							},
@@ -183,11 +183,11 @@ export class BankingAccount implements INodeType {
 						break;
 
 					case 'list':
-						responseData = await this.helpers.request({
+                        responseData = await this.helpers.request({
 							method: 'GET',
 							url: `${baseUrl}/api/accounts`,
 							headers: {
-								'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
 								'Idempotency-Key': idempotencyKey,
 								'X-Correlation-Id': correlationId,
 							},
@@ -198,11 +198,11 @@ export class BankingAccount implements INodeType {
 					case 'deposit':
 						const depositAccountId = this.getNodeParameter('accountId', i) as string;
 						const depositAmount = this.getNodeParameter('amount', i) as number;
-						responseData = await this.helpers.request({
+                        responseData = await this.helpers.request({
 							method: 'POST',
 							url: `${baseUrl}/api/accounts/${depositAccountId}/transactions`,
 							headers: {
-								'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
 								'Content-Type': 'application/json',
 								'Idempotency-Key': idempotencyKey,
 								'X-Correlation-Id': correlationId,

@@ -20,6 +20,7 @@ export async function POST(
     let userId = auth.userId
     let userEmail: string | null = null
     let supabase: any = null
+    let userContext: any = undefined
     if (!auth.usingApiKey) {
       const token = request.headers.get('authorization')!.replace('Bearer ', '')
       supabase = createClient(
@@ -29,6 +30,20 @@ export async function POST(
       )
       const { data: { user } } = await supabase.auth.getUser()
       userEmail = user?.email || null
+      if (user) {
+        const fullName = (user.user_metadata as any)?.full_name || null
+        const firstName = (user.user_metadata as any)?.first_name || (fullName ? String(fullName).split(' ')[0] : null)
+        const lastName = (user.user_metadata as any)?.last_name || (fullName ? String(fullName).split(' ').slice(1).join(' ') || null : null)
+        const phone = (user.user_metadata as any)?.phone || null
+        userContext = {
+          id: user.id,
+          email: user.email || null,
+          firstName,
+          lastName,
+          fullName,
+          phone,
+        }
+      }
     }
 
     // Parse request body
@@ -97,7 +112,7 @@ export async function POST(
 
     // Trigger n8n automation workflows
     try {
-      await n8nAutomation.onTransactionCreated(result.transaction, result.account)
+      await n8nAutomation.onTransactionCreated(result.transaction, result.account, userContext)
 
       // Check for low balance after withdrawal
       if (type === 'WITHDRAWAL') {
@@ -105,7 +120,7 @@ export async function POST(
         const lowBalanceThreshold = 100 // $100 threshold
 
         if (currentBalance < lowBalanceThreshold) {
-          await n8nAutomation.onLowBalance(id, currentBalance, lowBalanceThreshold)
+          await n8nAutomation.onLowBalance(id, currentBalance, lowBalanceThreshold, userContext)
         }
       }
       
@@ -124,15 +139,16 @@ export async function POST(
 
     return NextResponse.json(responseData, { status: 201 })
 
-  } catch (error) {
-    console.error('❌ ERROR creating transaction:', error)
+  } catch (error: unknown) {
+    const err = error as any
+    console.error('❌ ERROR creating transaction:', err)
     console.error('❌ Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
+      name: err?.name,
+      message: err?.message,
+      stack: err?.stack
     })
     return NextResponse.json(
-      { error: 'Failed to process transaction', details: error.message },
+      { error: 'Failed to process transaction', details: err?.message },
       { status: 500 }
     )
   }
@@ -205,11 +221,11 @@ export async function GET(
         accountId: id,
         ...(typeIn ? { type: { in: typeIn as any } } : {})
       },
-      include: {
+      include: ({
         card: true,
-        check: { include: { payee: true } },
+        check: true,
         payee: true
-      },
+      } as any),
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset

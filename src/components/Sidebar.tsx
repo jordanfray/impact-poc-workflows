@@ -1,8 +1,9 @@
 'use client'
 
-import { Flex, Text, Link, Box, Button, DropdownMenu, Avatar } from "@radix-ui/themes";
+import { Flex, Text, Link, Box, Button, DropdownMenu, Avatar, Badge } from "@radix-ui/themes";
 import { House } from "@phosphor-icons/react/dist/ssr/House";
 import { CreditCard } from "@phosphor-icons/react/dist/ssr/CreditCard";
+import { Bell } from "@phosphor-icons/react/dist/ssr/Bell";
 import { SignOut } from "@phosphor-icons/react/dist/ssr/SignOut";
 import { User } from "@phosphor-icons/react/dist/ssr/User";
 import { UserGear } from "@phosphor-icons/react/dist/ssr/UserGear";
@@ -11,11 +12,14 @@ import { useAuth } from "@/components/AuthProvider";
 import { ThemeLogo } from "@/components/ThemeLogo";
 import { useRouter } from 'next/navigation';
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export function Sidebar() {
   const { user, signOut, loading } = useAuth();
   const { profile } = useUserProfile();
   const router = useRouter();
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   const handleSignOut = async () => {
     console.log('Sign out button clicked!')
@@ -29,6 +33,22 @@ export function Sidebar() {
   const handleProfile = () => {
     router.push('/profile')
   }
+
+  useEffect(() => {
+    const loadUnread = async () => {
+      try {
+        if (!user) { setUnreadNotifications(0); return }
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        if (res.ok) {
+          const json = await res.json()
+          setUnreadNotifications(Number(json.unreadCount || 0))
+        }
+      } catch {}
+    }
+    loadUnread()
+  }, [user])
 
   return (
     <Box 
@@ -112,6 +132,37 @@ export function Sidebar() {
                 }}>
                   Accounts
                 </Text>
+              </Flex>
+            </Box>
+          </Link>
+
+          {/* Notifications */}
+          <Link href="/notifications">
+            <Box
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              className="nav-item"
+            >
+              <Flex align="center" gap="3">
+                <Box style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bell size={20} color="var(--gray-12)" />
+                </Box>
+                <Text size="3" weight="medium" style={{
+                  color: 'var(--gray-12)',
+                  fontFamily: 'F37Jan',
+                  fontSize: 16,
+                  fontWeight: 400,
+                  lineHeight: '24px',
+                }}>
+                  Notifications
+                </Text>
+                {unreadNotifications > 0 && (
+                  <Badge color="blue" variant="soft" style={{ marginLeft: 'auto' }}>{unreadNotifications}</Badge>
+                )}
               </Flex>
             </Box>
           </Link>

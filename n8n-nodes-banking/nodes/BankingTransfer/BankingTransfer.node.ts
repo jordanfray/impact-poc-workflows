@@ -136,11 +136,11 @@ export class BankingTransfer implements INodeType {
 					const apiKey = credentials.apiKey as string;
 
 					// Make the transfer API call
-					const response = await this.helpers.request({
+                    const response = await this.helpers.request({
 						method: 'POST',
 						url: `${baseUrl}/api/accounts/${fromAccountId}/transfer`,
 						headers: {
-							'Authorization': `Bearer ${apiKey}`,
+                            'X-API-Key': apiKey,
 							'Content-Type': 'application/json',
 							'Idempotency-Key': idempotencyKey,
 							'X-Correlation-Id': correlationId,

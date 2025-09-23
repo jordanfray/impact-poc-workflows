@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { createClient } from '@supabase/supabase-js'
 import { n8nAutomation } from '@/lib/n8n-integration'
+import { authenticateRequest } from '@/lib/auth'
 
 // Generate a random account number (for demo purposes)
 function generateAccountNumber(): string {
@@ -21,98 +22,73 @@ function generateDefaultNickname(existingCount: number): string {
 // GET /api/accounts - List user's accounts
 export async function GET(request: NextRequest) {
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
-    }
-
-    // Create a server-side Supabase client with the user's token
-    const token = authHeader.replace('Bearer ', '')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      }
-    )
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Support API key (X-API-Key) or Supabase JWT
+    const auth = await authenticateRequest(request.headers)
+    const userId = auth.userId
 
     // Get user's accounts through the AccountUser junction table
     const accounts = await prisma.account.findMany({
       where: {
         users: {
-          some: {
-            userId: user.id
-          }
+          some: { userId }
         }
       },
       include: {
-        users: {
-          where: {
-            userId: user.id
-          }
-        },
-        _count: {
-          select: {
-            transactions: true,
-            cards: true
-          }
-        }
+        users: { where: { userId } },
+        _count: { select: { transactions: true, cards: true } },
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: { createdAt: 'desc' },
     })
 
     return NextResponse.json({ accounts })
   } catch (error) {
     console.error('Error fetching accounts:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch accounts' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch accounts' }, { status: 500 })
   }
 }
 
 // POST /api/accounts - Create new account
 export async function POST(request: NextRequest) {
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
-    }
-
-    // Create a server-side Supabase client with the user's token
-    const token = authHeader.replace('Bearer ', '')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+    // Lightweight debugging for n8n → Impact calls
+    const debugCorrelationId = request.headers.get('x-correlation-id') || `n8n-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+    const authHeaderPreview = request.headers.get('authorization')?.slice(0, 16) || null
+    const hasApiKeyHeader = !!(request.headers.get('x-api-key') || request.headers.get('X-API-Key'))
+    const idempotencyKey = request.headers.get('idempotency-key') || null
+    console.log('[n8n-debug] /api/accounts POST headers', {
+      correlationId: debugCorrelationId,
+      hasApiKeyHeader,
+      authHeaderPreview,
+      idempotencyKey
+    })
+    // Support API key (X-API-Key) or Supabase JWT
+    const auth = await authenticateRequest(request.headers)
+    const userId = auth.userId
+    let userEmail: string | null = null
+    let userContext: any = undefined
+    if (!auth.usingApiKey) {
+      const token = request.headers.get('authorization')!.replace('Bearer ', '')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+        { global: { headers: { Authorization: `Bearer ${token}` } } }
+      )
+      const { data: { user } } = await supabase.auth.getUser()
+      userEmail = user?.email || null
+      if (user) {
+        const fullName = (user.user_metadata as any)?.full_name || null
+        const firstName = (user.user_metadata as any)?.first_name || (fullName ? String(fullName).split(' ')[0] : null)
+        const lastName = (user.user_metadata as any)?.last_name || (fullName ? String(fullName).split(' ').slice(1).join(' ') || null : null)
+        const phone = (user.user_metadata as any)?.phone || null
+        userContext = {
+          id: user.id,
+          email: user.email || null,
+          firstName,
+          lastName,
+          fullName,
+          phone,
+        }
       }
-    )
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Parse request body for optional nickname
@@ -131,7 +107,7 @@ export async function POST(request: NextRequest) {
     if (!nickname) {
       const existingAccountsCount = await prisma.accountUser.count({
         where: {
-          userId: user.id
+          userId: userId
         }
       })
       nickname = generateDefaultNickname(existingAccountsCount)
@@ -142,7 +118,7 @@ export async function POST(request: NextRequest) {
       // Create the account
       const account = await tx.account.create({
         data: {
-          nickname,
+          nickname: nickname || 'Account',
           accountNumber,
           balance: 0
         }
@@ -151,7 +127,7 @@ export async function POST(request: NextRequest) {
       // Link the user to the account
       await tx.accountUser.create({
         data: {
-          userId: user.id,
+          userId: userId,
           accountId: account.id
         }
       })
@@ -159,20 +135,23 @@ export async function POST(request: NextRequest) {
       return account
     })
 
-    console.log(`✅ Account created: ${result.nickname} (${result.accountNumber}) for user ${user.email}`)
+    console.log(`✅ Account created: ${result.nickname} (${result.accountNumber}) for ${auth.usingApiKey ? 'API key user' : userEmail}`)
 
-    // Trigger n8n automation for new account
+    // Trigger n8n automation for new account (with user context)
     try {
-      await n8nAutomation.onAccountCreated(result)
+      await n8nAutomation.onAccountCreated(result, userContext)
       console.log('🤖 n8n account creation automation triggered')
     } catch (error) {
       console.warn('⚠️ n8n automation failed (non-blocking):', error)
     }
 
-    return NextResponse.json({ 
+    const res = NextResponse.json({ 
       account: result,
-      message: 'Account created successfully'
+      message: 'Account created successfully',
+      correlationId: debugCorrelationId
     }, { status: 201 })
+    res.headers.set('X-Correlation-Id', debugCorrelationId)
+    return res
 
   } catch (error) {
     console.error('Error creating account:', error)

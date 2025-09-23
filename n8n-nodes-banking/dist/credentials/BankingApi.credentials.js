@@ -16,13 +16,13 @@ class BankingApi {
                 description: 'The base URL of your banking API',
             },
             {
-                displayName: 'API Key (Supabase Access Token)',
+                displayName: 'Impact API Key',
                 name: 'apiKey',
                 type: 'string',
                 typeOptions: { password: true },
                 default: '',
-                placeholder: 'your-supabase-access-token',
-                description: 'Your Supabase access token for API authentication',
+                placeholder: 'impk_xxx...',
+                description: 'Your Impact application API key from Profile → API Keys',
             },
         ];
         // Use generic authentication
@@ -30,7 +30,7 @@ class BankingApi {
             type: 'generic',
             properties: {
                 headers: {
-                    Authorization: '=Bearer {{$credentials.apiKey}}',
+                    'X-API-Key': '={{$credentials.apiKey}}',
                 },
             },
         };
@@ -40,6 +40,9 @@ class BankingApi {
                 baseURL: '={{$credentials.baseUrl}}',
                 url: '/api/accounts',
                 method: 'GET',
+                headers: {
+                    'X-API-Key': '={{$credentials.apiKey}}',
+                },
             },
         };
     }

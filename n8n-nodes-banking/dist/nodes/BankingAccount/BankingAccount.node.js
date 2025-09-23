@@ -132,7 +132,7 @@ class BankingAccount {
                             method: 'POST',
                             url: `${baseUrl}/api/accounts`,
                             headers: {
-                                'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
                                 'Content-Type': 'application/json',
                                 'Idempotency-Key': idempotencyKey,
                                 'X-Correlation-Id': correlationId,
@@ -147,7 +147,7 @@ class BankingAccount {
                             method: 'GET',
                             url: `${baseUrl}/api/accounts/${accountId}`,
                             headers: {
-                                'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
                                 'Idempotency-Key': idempotencyKey,
                                 'X-Correlation-Id': correlationId,
                             },
@@ -160,7 +160,7 @@ class BankingAccount {
                             method: 'GET',
                             url: `${baseUrl}/api/accounts/${balanceAccountId}`,
                             headers: {
-                                'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
                                 'Idempotency-Key': idempotencyKey,
                                 'X-Correlation-Id': correlationId,
                             },
@@ -177,7 +177,7 @@ class BankingAccount {
                             method: 'GET',
                             url: `${baseUrl}/api/accounts`,
                             headers: {
-                                'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
                                 'Idempotency-Key': idempotencyKey,
                                 'X-Correlation-Id': correlationId,
                             },
@@ -191,7 +191,7 @@ class BankingAccount {
                             method: 'POST',
                             url: `${baseUrl}/api/accounts/${depositAccountId}/transactions`,
                             headers: {
-                                'Authorization': `Bearer ${apiKey}`,
+                                'X-API-Key': apiKey,
                                 'Content-Type': 'application/json',
                                 'Idempotency-Key': idempotencyKey,
                                 'X-Correlation-Id': correlationId,
